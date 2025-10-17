@@ -1,0 +1,82 @@
+# Environment and secrets
+.env
+*.key
+*.pem
+
+# AI-generated files (should be regenerated)
+config/providers.generated.yaml
+
+# Session state (not committed)
+PROJECT_PLAN.md
+CLAUDE.md
+
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+build/
+develop-eggs/
+dist/
+downloads/
+eggs/
+.eggs/
+lib/
+lib64/
+parts/
+sdist/
+var/
+wheels/
+*.egg-info/
+.installed.cfg
+*.egg
+
+# Virtual environments
+venv/
+ENV/
+env/
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+
+# Data files (large datasets)
+data/datasets/*.json
+data/datasets/*.csv
+data/datasets/*.parquet
+data/cache/
+data/results/
+
+# Keep directory structure
+!data/datasets/.gitkeep
+!data/cache/.gitkeep
+!data/results/.gitkeep
+
+# Jupyter
+.ipynb_checkpoints/
+*.ipynb
+
+# Logs
+*.log
+logs/
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Testing
+.pytest_cache/
+.coverage
+htmlcov/
+
+# Playwright
+node_modules/
+/test-results/
+/playwright-report/
+/blob-report/
+/playwright/.cache/
+/playwright/.auth/

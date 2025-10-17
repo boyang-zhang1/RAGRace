@@ -1,0 +1,14 @@
+# Human-written RAG Provider Configuration
+# Simple format: just add provider name and API documentation URL
+# The AI will read these docs and generate detailed configuration
+
+providers:
+  - name: llamaindex
+    api_doc_url: https://docs.llamaindex.ai/en/stable/api_reference/
+
+  - name: landingai
+    api_doc_url: https://landing.ai/docs/api
+
+  # Add more providers here with just name and api_doc_url
+  # - name: your_provider
+  #   api_doc_url: https://your-provider.com/docs

@@ -1,0 +1,18 @@
+# Dataset Configuration
+# Define datasets for RAG evaluation
+
+datasets:
+  # SQuAD 2.0 - Stanford Question Answering Dataset
+  - name: squad_v2
+    source: data/datasets/dev-v2.0.json
+    format: json
+    preprocessor: squad
+    description: Stanford Question Answering Dataset v2.0
+    size: ~12k questions
+
+  # Add more datasets here
+  # - name: custom_dataset
+  #   source: data/datasets/custom.json
+  #   format: json
+  #   preprocessor: custom
+  #   description: Description of your dataset

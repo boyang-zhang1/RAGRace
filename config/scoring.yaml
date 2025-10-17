@@ -1,0 +1,58 @@
+# Scoring Configuration
+# LLM-based evaluation with structured outputs
+
+scoring:
+  # Use GPT-4o-mini for cost efficiency
+  model: gpt-4o-mini
+  api_key_env: OPENAI_API_KEY
+
+  # Batch all predictions in ONE prompt for:
+  # 1. Fairness - LLM sees all predictions together
+  # 2. Efficiency - Save tokens and API calls
+  batch_mode: true
+
+  # Simple metrics inspired by SQuAD 2.0 evaluation
+  # See evaluate-v2.0.py for reference metrics
+  metrics:
+    # Exact Match: 0 or 1 (prediction matches ground truth exactly after normalization)
+    - name: exact_match
+      type: binary
+      description: Exact match after text normalization
+
+    # Semantic similarity: 0-100 (how similar is the meaning)
+    - name: semantic_score
+      type: score
+      range: [0, 100]
+      description: Semantic similarity to ground truth
+
+  # SIMPLE prompt - only GT and predictions, no context!
+  # All predictions scored in ONE call for fairness
+  prompt_template: |
+    Compare each prediction to the ground truth answer.
+    Score semantic similarity 0-100 (0=completely wrong, 100=perfect match).
+
+    Question: {question}
+    Ground Truth: {ground_truth}
+
+    Predictions:
+    {predictions}
+
+    Return scores only, no explanations.
+
+  # Structured output schema
+  # Will use Pydantic to enforce this structure
+  output_schema:
+    type: object
+    properties:
+      scores:
+        type: array
+        items:
+          type: object
+          properties:
+            provider:
+              type: string
+            semantic_score:
+              type: integer
+              minimum: 0
+              maximum: 100
+    required: [scores]
