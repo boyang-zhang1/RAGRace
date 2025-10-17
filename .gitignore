@@ -2,13 +2,14 @@
 .env
 *.key
 *.pem
+.claude/
 
 # AI-generated files (should be regenerated)
 config/providers.generated.yaml
-
-# Session state (not committed)
-PROJECT_PLAN.md
 CLAUDE.md
+
+# Session state and local documentation (not committed)
+local_docs/
 
 # Python
 __pycache__/
@@ -44,12 +45,17 @@ env/
 *.swo
 *~
 
-# Data files (large datasets)
-data/datasets/*.json
-data/datasets/*.csv
-data/datasets/*.parquet
+# Data files (large datasets - NOT committed)
+data/datasets/**/*.json
+data/datasets/**/*.csv
+data/datasets/**/*.parquet
 data/cache/
 data/results/
+
+# But KEEP metadata and small test files
+!data/datasets/**/dataset.yaml
+!data/datasets/**/README.md
+!data/test/*.json
 
 # Keep directory structure
 !data/datasets/.gitkeep

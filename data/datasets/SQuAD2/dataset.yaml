@@ -1,0 +1,59 @@
+# SQuAD 2.0 Dataset Metadata
+# This file is committed to git to provide dataset context to AI
+# Actual data files are NOT committed (too large)
+
+name: SQuAD2
+version: v2.0
+type: squad2
+source_url: https://rajpurkar.github.io/SQuAD-explorer/
+
+description: >
+  Stanford Question Answering Dataset v2.0.
+  Reading comprehension dataset with questions on Wikipedia articles.
+  Includes "impossible" questions (no answer in context).
+
+files:
+  train:
+    filename: train-v2.0.json
+    size_mb: 40
+    articles: 442
+    questions: 130319
+    impossible_questions: 43498
+
+  dev:
+    filename: dev-v2.0.json
+    size_mb: 4.2
+    articles: 35
+    questions: 11873
+    impossible_questions: 5945
+
+structure:
+  format: json
+  schema:
+    version: string
+    data:
+      - title: string
+        paragraphs:
+          - context: string
+            qas:
+              - question: string
+                id: string
+                answers: [{text: string, answer_start: int}]
+                is_impossible: boolean
+
+sample_titles:
+  - Beyoncé
+  - Frédéric_Chopin
+  - Sino-Tibetan_relations_during_the_Ming_dynasty
+  - Normans
+  - Computational_complexity_theory
+
+usage:
+  loader: DatasetLoader.load_squad()
+  preprocessor: SquadPreprocessor
+  test_file: data/test/mini_squad.json (3 questions, committed)
+
+notes:
+  - Large files NOT committed to git (in .gitignore)
+  - Download from official source if needed
+  - Use mini_squad.json for testing
