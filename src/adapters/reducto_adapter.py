@@ -322,17 +322,45 @@ class ReductoAdapter(BaseAdapter):
             "Content-Type": "application/json"
         }
 
-        # Determine input source
-        if "document_url" in doc.metadata:
-            input_url = doc.metadata["document_url"]
-        elif "file_path" in doc.metadata:
+        # STRICT: Only process PDF files (no silent fallback)
+        if "document_url" in doc.metadata and doc.metadata["document_url"]:
+            document_url = doc.metadata["document_url"]
+
+            # Validate PDF URL
+            if not document_url.lower().endswith('.pdf'):
+                logger.warning(
+                    f"Document {doc.id} URL may not be a PDF: {document_url}. "
+                    f"Proceeding anyway, but results may be unexpected."
+                )
+
+            logger.info(f"Parsing PDF via Reducto (URL): {document_url}")
+            input_url = document_url
+
+        elif "file_path" in doc.metadata and doc.metadata["file_path"]:
+            file_path = str(doc.metadata["file_path"])
+
+            # Validate PDF file extension
+            if not file_path.lower().endswith('.pdf'):
+                error_msg = (
+                    f"Document {doc.id} has non-PDF file: {file_path}. "
+                    f"Reducto adapter requires PDF files for document parsing."
+                )
+                logger.error(error_msg)
+                raise ValueError(error_msg)
+
+            logger.info(f"Parsing PDF via Reducto: {file_path}")
             # Upload file first if we have a file path
-            input_url = self._upload_file(doc.metadata["file_path"])
+            input_url = self._upload_file(file_path)
+
         else:
-            raise ValueError(
-                "Document must have 'document_url' or 'file_path' in metadata. "
-                "Reducto requires document URLs or files."
+            # NO FALLBACK: Explicitly require file_path or document_url
+            error_msg = (
+                f"Document {doc.id} missing both 'file_path' and 'document_url' in metadata. "
+                f"Reducto adapter requires PDF files for document parsing. "
+                f"Got metadata: {list(doc.metadata.keys())}"
             )
+            logger.error(error_msg)
+            raise ValueError(error_msg)
 
         # Build request payload with RAG-optimized configuration
         payload = {

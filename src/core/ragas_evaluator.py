@@ -11,8 +11,7 @@ from dataclasses import dataclass
 
 from ragas import evaluate, EvaluationDataset
 from ragas.metrics import LLMContextRecall, Faithfulness, FactualCorrectness
-from ragas.llms import LangchainLLMWrapper
-from langchain_openai import ChatOpenAI
+from ragas.llms import llm_factory
 
 
 @dataclass
@@ -71,9 +70,8 @@ class RagasEvaluator:
         if not api_key:
             raise ValueError(f"API key not found in environment variable: {api_key_env}")
 
-        # Initialize LLM for Ragas
-        llm = ChatOpenAI(model=model, api_key=api_key)
-        self.evaluator_llm = LangchainLLMWrapper(llm)
+        # Initialize LLM for Ragas using modern factory
+        self.evaluator_llm = llm_factory(model)
 
         # Initialize metrics
         metric_names = config.get('metrics', ['faithfulness', 'factual_correctness', 'context_recall'])

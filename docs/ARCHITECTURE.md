@@ -6,6 +6,8 @@
 - **orchestrator.py** - Main workflow coordinator
 - **adapter_factory.py** - Creates adapter instances
 - **scorer.py** - Batch LLM scoring (GPT structured outputs)
+- **ragas_evaluator.py** - Ragas metric evaluation (faithfulness, factual correctness, context recall)
+- **rag_logger.py** - Structured logging for multi-paper RAG experiments
 
 ### Adapters (`src/adapters/`)
 - **base.py** - BaseAdapter interface (ALL providers must implement)
@@ -52,15 +54,16 @@ RAGResponse(answer, context, metadata, latency_ms, tokens_used)
 - Exact Match (0/1) - SQuAD-style normalization
 - Semantic Score (0-100) - GPT evaluation
 
-**Model**: gpt-4o-mini with structured outputs
+**Model**: gpt-5-mini with structured outputs
 
 ## Implemented Providers
 
 ### LlamaIndex
 - **Type**: Full RAG framework
-- **Components**: VectorStoreIndex + OpenAI embeddings + OpenAI LLM
+- **Components**: LlamaParse (PDF) + VectorStoreIndex + OpenAI embeddings + OpenAI LLM
 - **Storage**: In-memory SimpleVectorStore
-- **Features**: Automatic chunking, semantic retrieval, response synthesis
+- **Features**: Cloud PDF parsing, automatic chunking, semantic retrieval, response synthesis
+- **Requirements**: PDF files via `file_path` metadata
 - **Tests**: 11 unit + 3 integration
 
 ### LandingAI ADE (Agentic Document Extraction)
@@ -68,6 +71,7 @@ RAGResponse(answer, context, metadata, latency_ms, tokens_used)
 - **Components**: ADE API + external embeddings + external LLM
 - **Parsing**: 8 semantic chunk types (text, table, figure, logo, card, etc.)
 - **Features**: Grounding metadata, bounding boxes, multi-modal
+- **Requirements**: PDF files via `file_path` or `document_url` metadata
 - **Storage**: In-memory vector store (NumPy)
 - **Tests**: 11 unit + 3 integration
 
@@ -76,6 +80,7 @@ RAGResponse(answer, context, metadata, latency_ms, tokens_used)
 - **Components**: Reducto API + external embeddings + external LLM
 - **Parsing**: Variable-size semantic chunking
 - **Features**: Embedding-optimized output, AI enrichment, figure summarization
+- **Requirements**: PDF files via `file_path` or `document_url` metadata
 - **Storage**: In-memory vector store (NumPy)
 - **Tests**: 11 unit + 4 integration
 
@@ -83,7 +88,7 @@ RAGResponse(answer, context, metadata, latency_ms, tokens_used)
 
 1. **Human** (`config/providers.yaml`): name + api_doc_url
 2. **AI** (`config/providers.generated.yaml`): detailed API specs from research
-3. **Secrets** (`.env`): API keys (OPENAI_API_KEY, VISION_AGENT_API_KEY, REDUCTO_API_KEY)
+3. **Secrets** (`.env`): API keys (OPENAI_API_KEY, LLAMAINDEX_API_KEY, VISION_AGENT_API_KEY, REDUCTO_API_KEY)
 
 ## Execution Flow (Current Implementation)
 
@@ -104,11 +109,11 @@ RAGResponse(answer, context, metadata, latency_ms, tokens_used)
 - **Python 3.11+**
 - **Core Libraries**:
   - `llama-index-core`, `llama-index-embeddings-openai`, `llama-index-llms-openai`
+  - `llama-parse` (PDF parsing for LlamaIndex)
   - `openai` (embeddings + LLM + scoring)
   - `requests` (HTTP API calls)
   - `numpy` (vector operations)
   - `ragas` (RAG evaluation metrics)
-  - `langchain-openai` (Ragas dependency)
 - **Testing**: `pytest` (50+ tests, unit + integration)
 - **Web Research**: Playwright MCP (via Task tool)
 - **Environment**: `python-dotenv` (API key management)

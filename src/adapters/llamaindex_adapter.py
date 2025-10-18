@@ -16,6 +16,7 @@ try:
     from llama_index.core import VectorStoreIndex, Document as LlamaDocument, Settings
     from llama_index.embeddings.openai import OpenAIEmbedding
     from llama_index.llms.openai import OpenAI
+    from llama_parse import LlamaParse
     LLAMAINDEX_AVAILABLE = True
 except ImportError:
     LLAMAINDEX_AVAILABLE = False
@@ -36,6 +37,7 @@ class LlamaIndexAdapter(BaseAdapter):
         self._indices: Dict[str, VectorStoreIndex] = {}  # Map index_id -> VectorStoreIndex
         self._initialized = False
         self._api_key: Optional[str] = None
+        self._llamacloud_api_key: Optional[str] = None
 
     def initialize(self, api_key: str, **kwargs) -> None:
         """
@@ -44,6 +46,7 @@ class LlamaIndexAdapter(BaseAdapter):
         Args:
             api_key: OpenAI API key (used for both embeddings and LLM)
             **kwargs: Additional configuration options:
+                - llamacloud_api_key: LlamaCloud API key for LlamaParse (required for PDF parsing)
                 - embedding_model: OpenAI embedding model (default: "text-embedding-3-small")
                 - llm_model: OpenAI LLM model (default: "gpt-4o-mini")
                 - chunk_size: Chunk size for document splitting (default: 1024)
@@ -53,10 +56,14 @@ class LlamaIndexAdapter(BaseAdapter):
         if not LLAMAINDEX_AVAILABLE:
             raise ImportError(
                 "LlamaIndex is not installed. Install with: "
-                "pip install llama-index-core llama-index-embeddings-openai llama-index-llms-openai"
+                "pip install llama-index-core llama-index-embeddings-openai llama-index-llms-openai llama-parse"
             )
 
         self._api_key = api_key
+        self._llamacloud_api_key = kwargs.get("llamacloud_api_key")
+
+        if not self._llamacloud_api_key:
+            raise ValueError("llamacloud_api_key is required for PDF parsing with LlamaParse")
 
         # Extract configuration
         embedding_model = kwargs.get("embedding_model", "text-embedding-3-small")
@@ -111,12 +118,52 @@ class LlamaIndexAdapter(BaseAdapter):
         # Convert RAGRace documents to LlamaIndex documents
         llama_docs = []
         for doc in documents:
-            llama_doc = LlamaDocument(
-                text=doc.content,
-                doc_id=doc.id,
-                metadata=doc.metadata
-            )
-            llama_docs.append(llama_doc)
+            # STRICT: Only process PDF files (no silent fallback to text)
+            if "file_path" not in doc.metadata or not doc.metadata["file_path"]:
+                error_msg = (
+                    f"Document {doc.id} missing 'file_path' in metadata. "
+                    f"LlamaIndex adapter requires PDF files for LlamaParse cloud API. "
+                    f"Got metadata: {list(doc.metadata.keys())}"
+                )
+                logger.error(error_msg)
+                raise ValueError(error_msg)
+
+            file_path = doc.metadata["file_path"]
+
+            # Validate PDF file extension
+            if not str(file_path).lower().endswith('.pdf'):
+                error_msg = (
+                    f"Document {doc.id} has non-PDF file: {file_path}. "
+                    f"LlamaIndex adapter requires PDF files for LlamaParse cloud API."
+                )
+                logger.error(error_msg)
+                raise ValueError(error_msg)
+
+            # Load PDF using LlamaParse cloud API (for proper PDF text extraction)
+            logger.info(f"Loading PDF file via LlamaParse cloud API: {file_path}")
+
+            try:
+                # Initialize LlamaParse with cloud API key
+                parser = LlamaParse(
+                    api_key=self._llamacloud_api_key,
+                    result_type="markdown",  # Use markdown for better structure preservation
+                    verbose=False
+                )
+
+                # Parse PDF via cloud API
+                pdf_docs = parser.load_data(file_path)
+
+                # Update metadata with original doc_id
+                for pdf_doc in pdf_docs:
+                    pdf_doc.doc_id = doc.id
+                    # Merge metadata from RAGDocument
+                    pdf_doc.metadata.update(doc.metadata)
+
+                llama_docs.extend(pdf_docs)
+                logger.info(f"Loaded {len(pdf_docs)} document(s) from {file_path}")
+            except Exception as e:
+                logger.error(f"Failed to load PDF {file_path}: {e}")
+                raise
 
         logger.info(f"Ingesting {len(llama_docs)} documents into LlamaIndex")
 

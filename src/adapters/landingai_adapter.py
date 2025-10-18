@@ -308,10 +308,22 @@ class LandingAIAdapter(BaseAdapter):
             "Authorization": f"Bearer {self._api_key}"
         }
 
-        # Prepare multipart form data
-        # If document has a file path in metadata, use it; otherwise use content as text
-        if "file_path" in doc.metadata:
-            with open(doc.metadata["file_path"], "rb") as f:
+        # STRICT: Only process PDF files (no silent fallback)
+        if "file_path" in doc.metadata and doc.metadata["file_path"]:
+            file_path = str(doc.metadata["file_path"])
+
+            # Validate PDF file extension
+            if not file_path.lower().endswith('.pdf'):
+                error_msg = (
+                    f"Document {doc.id} has non-PDF file: {file_path}. "
+                    f"LandingAI adapter requires PDF files for document parsing."
+                )
+                logger.error(error_msg)
+                raise ValueError(error_msg)
+
+            logger.info(f"Parsing PDF via LandingAI: {file_path}")
+
+            with open(file_path, "rb") as f:
                 files = {"document": f}
                 data = {"model": self._parse_model}
 
@@ -322,10 +334,21 @@ class LandingAIAdapter(BaseAdapter):
                     data=data,
                     timeout=300
                 )
-        elif "document_url" in doc.metadata:
+        elif "document_url" in doc.metadata and doc.metadata["document_url"]:
+            document_url = doc.metadata["document_url"]
+
+            # Validate PDF URL
+            if not document_url.lower().endswith('.pdf'):
+                logger.warning(
+                    f"Document {doc.id} URL may not be a PDF: {document_url}. "
+                    f"Proceeding anyway, but results may be unexpected."
+                )
+
+            logger.info(f"Parsing PDF via LandingAI (URL): {document_url}")
+
             # Use URL-based parsing
             data = {
-                "document_url": doc.metadata["document_url"],
+                "document_url": document_url,
                 "model": self._parse_model
             }
             response = requests.post(
@@ -335,12 +358,14 @@ class LandingAIAdapter(BaseAdapter):
                 timeout=300
             )
         else:
-            # Fallback: treat content as text (not ideal for LandingAI which expects files)
-            # This is a limitation - LandingAI expects actual documents
-            raise ValueError(
-                "Document must have 'file_path' or 'document_url' in metadata. "
-                "LandingAI requires actual document files, not plain text."
+            # NO FALLBACK: Explicitly require file_path or document_url
+            error_msg = (
+                f"Document {doc.id} missing both 'file_path' and 'document_url' in metadata. "
+                f"LandingAI adapter requires PDF files for document parsing. "
+                f"Got metadata: {list(doc.metadata.keys())}"
             )
+            logger.error(error_msg)
+            raise ValueError(error_msg)
 
         response.raise_for_status()
         return response.json()

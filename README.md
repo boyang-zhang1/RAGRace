@@ -129,6 +129,21 @@ Complete 3-way provider comparison on Qasper dataset:
 pytest tests/test_qasper_rag_e2e.py::TestQasperRAGRace::test_ragrace_3_providers_qasper -v -s -m integration
 ```
 
+**Customize paper/question count:**
+
+Edit `tests/test_qasper_rag_e2e.py` lines 102-103:
+
+```python
+max_papers = 1      # Change to 10 for 10 papers
+max_questions = 3   # Change to None for all questions, or 10 for 10 questions
+```
+
+**Examples:**
+- `max_papers=1, max_questions=3` → 1 paper, 3 questions (~2 min, $0.20)
+- `max_papers=5, max_questions=10` → 5 papers, 10 questions per paper (~15 min, $2)
+- `max_papers=10, max_questions=None` → 10 papers, ALL questions (~30 min, $5)
+- `max_papers=None, max_questions=None` → ALL 888 papers, ALL questions (EXPENSIVE!)
+
 ## Project Structure
 
 ```

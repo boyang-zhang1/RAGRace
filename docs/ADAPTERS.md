@@ -55,6 +55,7 @@ class RAGResponse:
 - **Lines of Code**: 253
 
 **Components**:
+- PDF Parser: LlamaParse cloud API (markdown format)
 - Vector Store: In-memory `SimpleVectorStore`
 - Index: `VectorStoreIndex`
 - Embeddings: OpenAI `text-embedding-3-small`
@@ -65,6 +66,7 @@ class RAGResponse:
 ```python
 adapter.initialize(
     api_key=openai_api_key,
+    llamacloud_api_key=llamaindex_api_key,     # Required for LlamaParse
     embedding_model="text-embedding-3-small",  # Optional
     llm_model="gpt-4o-mini",                   # Optional
     chunk_size=1024,                            # Optional
@@ -74,11 +76,17 @@ adapter.initialize(
 ```
 
 **Features**:
+- ✅ Cloud-based PDF parsing (LlamaParse)
 - ✅ Automatic document chunking
 - ✅ Semantic retrieval with similarity scores
 - ✅ Response synthesis with source nodes
 - ✅ Configurable chunk size and overlap
 - ✅ Native vector search
+
+**Input Requirements**:
+- Requires PDF files via `file_path` metadata
+- Validates `.pdf` extension (strict)
+- No plain text fallback
 
 **Testing**:
 - Unit Tests: 11 (all passing)
@@ -87,11 +95,13 @@ adapter.initialize(
 
 **Pros**:
 - Complete out-of-the-box solution
+- High-quality PDF extraction (LlamaParse)
 - Well-documented framework
 - Minimal code required
 
 **Cons**:
-- Requires OpenAI API
+- Requires 2 API keys (OpenAI + LlamaIndex Cloud)
+- PDF files only (no plain text)
 - Less control over chunking strategy
 - In-memory only (no persistence in current implementation)
 
@@ -135,6 +145,8 @@ adapter.initialize(
 
 **Supported Input**:
 - Requires `document_url` or `file_path` in metadata
+- Validates `.pdf` extension for `file_path` (strict)
+- Warns for non-PDF URLs (proceeds anyway)
 - Does NOT work with plain text content
 - Supported formats: PDF, JPEG, PNG, TIFF, BMP, WEBP, JP2, GIF
 
@@ -208,6 +220,8 @@ adapter.initialize(
 
 **Supported Input**:
 - Requires `document_url` or `file_path` in metadata
+- Validates `.pdf` extension for `file_path` (strict)
+- Warns for non-PDF URLs (proceeds anyway)
 - Supports file upload via `/upload` endpoint
 - Supported formats: PDF, DOCX, XLSX, Images
 
@@ -253,11 +267,12 @@ adapter.initialize(
 | Feature | LlamaIndex | LandingAI | Reducto |
 |---------|-----------|-----------|---------|
 | **Type** | Full RAG | Doc Preprocessing | Doc Preprocessing |
+| **PDF Parser** | LlamaParse Cloud | LandingAI ADE | Reducto API |
 | **Embeddings** | Built-in (OpenAI) | External (OpenAI) | External (OpenAI) |
 | **Vector Store** | Built-in | Adapter (NumPy) | Adapter (NumPy) |
 | **LLM** | Built-in (OpenAI) | External (OpenAI) | External (OpenAI) |
 | **Chunking** | Fixed-size | 8 semantic types | Variable-size |
-| **Input** | Text/Documents | Documents only | Documents only |
+| **Input** | PDF only | PDF only | PDF only |
 | **Grounding** | ❌ No | ✅ Bounding boxes | ✅ Bounding boxes |
 | **Multi-Modal** | Limited | ✅ 8 types | ✅ Good |
 | **AI Enrichment** | ❌ No | ❌ No | ✅ Yes |
@@ -266,7 +281,7 @@ adapter.initialize(
 | **Max File Size (Sync)** | N/A | 50MB | No limit |
 | **Max Pages (Sync)** | N/A | 50 | No limit |
 | **Code Complexity** | Low | Medium | Medium |
-| **API Keys Required** | 1 (OpenAI) | 2 (LandingAI + OpenAI) | 2 (Reducto + OpenAI) |
+| **API Keys Required** | 2 (OpenAI + LlamaIndex) | 2 (LandingAI + OpenAI) | 2 (Reducto + OpenAI) |
 
 ## Performance Characteristics
 
@@ -342,6 +357,7 @@ docs = [Document(
 ```bash
 # LlamaIndex
 OPENAI_API_KEY=your_openai_key
+LLAMAINDEX_API_KEY=your_llamaindex_cloud_key
 
 # LandingAI
 VISION_AGENT_API_KEY=your_landingai_key

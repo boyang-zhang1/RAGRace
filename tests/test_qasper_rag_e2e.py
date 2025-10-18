@@ -34,6 +34,7 @@ from pathlib import Path
 
 from src.datasets.loader import DatasetLoader
 from src.core.ragas_evaluator import RagasEvaluator, RAGEvaluationSample
+from src.core.rag_logger import RAGLogger
 from src.adapters.llamaindex_adapter import LlamaIndexAdapter
 from src.adapters.landingai_adapter import LandingAIAdapter
 from src.adapters.reducto_adapter import ReductoAdapter
@@ -50,6 +51,14 @@ class TestQasperRAGRace:
         key = os.getenv("OPENAI_API_KEY")
         if not key:
             pytest.skip("OPENAI_API_KEY not set - skipping test")
+        return key
+
+    @pytest.fixture
+    def llamaindex_api_key(self):
+        """Get LlamaIndex Cloud API key."""
+        key = os.getenv("LLAMAINDEX_API_KEY")
+        if not key:
+            pytest.skip("LLAMAINDEX_API_KEY not set - skipping test")
         return key
 
     @pytest.fixture
@@ -81,6 +90,7 @@ class TestQasperRAGRace:
     def test_ragrace_3_providers_qasper(
         self,
         openai_api_key,
+        llamaindex_api_key,
         landingai_api_key,
         reducto_api_key,
         ragas_evaluator
@@ -100,30 +110,65 @@ class TestQasperRAGRace:
             max_questions: Questions per paper (default: 3 for demo)
         """
         max_papers = 1
-        max_questions = 3
+        max_questions = 1
+
+        # Initialize comprehensive logger
+        rag_logger = RAGLogger(log_dir="data/results", test_name="qasper_ragrace")
 
         print("\n" + "=" * 80)
         print("🏁 RAGRACE: 3-WAY PROVIDER COMPARISON ON QASPER")
         print("=" * 80)
 
-        # Step 1: Load Qasper paper
-        print(f"\n📥 Loading Qasper paper ({max_papers} paper, {max_questions} questions)...")
+        rag_logger.log_section("RAGRACE: 3-WAY PROVIDER COMPARISON ON QASPER")
+        rag_logger.log(f"Configuration: {max_papers} papers, {max_questions} questions per paper")
+        rag_logger.log("")
+
+        # Step 1: Load Qasper papers
+        print(f"\n📥 Loading Qasper papers ({max_papers} papers, {max_questions} questions per paper)...")
         dataset = DatasetLoader.load_qasper(
             split='train',
             max_papers=max_papers,
             filter_unanswerable=True
         )
 
-        samples = dataset.samples[:max_questions]
-        paper_id = samples[0].metadata['paper_id']
-        paper_title = samples[0].metadata['paper_title']
-        original_pdf_path = Path(samples[0].metadata['pdf_path'])  # ORIGINAL PDF from arxiv!
+        # Group samples by paper_id
+        from collections import defaultdict
+        papers_dict = defaultdict(list)
+        for sample in dataset.samples:
+            paper_id = sample.metadata['paper_id']
+            papers_dict[paper_id].append(sample)
 
-        print(f"✓ Loaded paper: {paper_id}")
-        print(f"  Title: {paper_title[:80]}...")
-        print(f"  Original PDF: {original_pdf_path}")
-        print(f"  PDF size: {original_pdf_path.stat().st_size} bytes")
-        print(f"  Questions: {len(samples)}")
+        # Select papers and questions
+        papers_to_test = []
+        total_questions = 0
+        for paper_id, paper_samples in list(papers_dict.items())[:max_papers]:
+            # Take up to max_questions per paper
+            selected_samples = paper_samples[:max_questions]
+            if selected_samples:
+                paper_info = {
+                    'paper_id': paper_id,
+                    'paper_title': selected_samples[0].metadata['paper_title'],
+                    'pdf_path': Path(selected_samples[0].metadata['pdf_path']),
+                    'samples': selected_samples
+                }
+                papers_to_test.append(paper_info)
+                total_questions += len(selected_samples)
+                print(f"✓ Loaded paper: {paper_id}")
+                print(f"  Title: {paper_info['paper_title'][:80]}...")
+                print(f"  PDF: {paper_info['pdf_path']}")
+                print(f"  PDF size: {paper_info['pdf_path'].stat().st_size} bytes")
+                print(f"  Questions: {len(selected_samples)}")
+
+                # Log paper details
+                rag_logger.log_paper(
+                    paper_id=paper_id,
+                    paper_title=paper_info['paper_title'],
+                    pdf_path=str(paper_info['pdf_path']),
+                    pdf_size=paper_info['pdf_path'].stat().st_size,
+                    num_questions=len(selected_samples)
+                )
+
+        print(f"\n📊 Total: {len(papers_to_test)} papers, {total_questions} questions")
 
         # Step 2: Initialize ALL 3 RAG providers
         print("\n📦 Initializing ALL 3 RAG providers...")
@@ -131,7 +176,11 @@ class TestQasperRAGRace:
 
         # LlamaIndex
         adapters['LlamaIndex'] = LlamaIndexAdapter()
-        adapters['LlamaIndex'].initialize(api_key=openai_api_key, top_k=3)
+        adapters['LlamaIndex'].initialize(
+            api_key=openai_api_key,
+            llamacloud_api_key=llamaindex_api_key,
+            top_k=3
+        )
         print("  ✓ LlamaIndex initialized")
 
         # LandingAI
@@ -152,81 +201,111 @@ class TestQasperRAGRace:
         )
         print("  ✓ Reducto initialized")
 
-        # Step 3: Upload SAME ORIGINAL PDF to ALL 3 providers
-        print(f"\n🔄 Uploading ORIGINAL PDF to ALL 3 providers: {original_pdf_path.name}")
-        indices = {}
-
-        # LlamaIndex: Original PDF
-        pdf_doc_llama = Document(
-            id=paper_id,
-            content="",
-            metadata={'file_path': str(original_pdf_path), 'title': paper_title}
-        )
-        indices['LlamaIndex'] = adapters['LlamaIndex'].ingest_documents([pdf_doc_llama])
-        print(f"  ✓ LlamaIndex ingested PDF")
-
-        # LandingAI: Original PDF
-        pdf_doc_landingai = Document(
-            id=paper_id,
-            content="",
-            metadata={'file_path': str(original_pdf_path), 'title': paper_title}
-        )
-        indices['LandingAI'] = adapters['LandingAI'].ingest_documents([pdf_doc_landingai])
-        print(f"  ✓ LandingAI ingested PDF")
-
-        # Reducto: Original PDF
-        pdf_doc_reducto = Document(
-            id=paper_id,
-            content="",
-            metadata={'file_path': str(original_pdf_path), 'title': paper_title}
-        )
-        indices['Reducto'] = adapters['Reducto'].ingest_documents([pdf_doc_reducto])
-        print(f"  ✓ Reducto ingested PDF")
-
-        # Step 4: Query ALL 3 providers with SAME questions
-        print(f"\n📝 Querying ALL 3 providers ({len(samples)} questions)...")
-        print("=" * 80)
-
         # Store all samples for evaluation (per provider)
         provider_samples = {name: [] for name in adapters.keys()}
 
-        for i, sample in enumerate(samples, 1):
-            question = sample.question
-            ground_truth = sample.ground_truth
+        # Step 3 & 4: Process each paper separately
+        for paper_idx, paper in enumerate(papers_to_test, 1):
+            paper_id = paper['paper_id']
+            paper_title = paper['paper_title']
+            pdf_path = paper['pdf_path']
+            samples = paper['samples']
 
-            print(f"\n❓ Question {i}: {question}")
-            print(f"   Ground Truth: {ground_truth[:100]}...")
-            print()
+            print(f"\n{'='*80}")
+            print(f"📄 PAPER {paper_idx}/{len(papers_to_test)}: {paper_id}")
+            print(f"{'='*80}")
 
-            # Query each provider
-            for provider_name, adapter in adapters.items():
-                response = adapter.query(question, indices[provider_name])
+            # Step 3: Upload this paper's PDF to ALL 3 providers
+            print(f"\n🔄 Uploading PDF to ALL 3 providers: {pdf_path.name}")
+            indices = {}
 
-                print(f"   {provider_name}:")
-                print(f"     Answer: {response.answer[:100]}...")
-                print(f"     Latency: {response.latency_ms:.0f}ms | Chunks: {len(response.context)}")
+            # LlamaIndex: Original PDF
+            pdf_doc_llama = Document(
+                id=paper_id,
+                content="",
+                metadata={'file_path': str(pdf_path), 'title': paper_title}
+            )
+            indices['LlamaIndex'] = adapters['LlamaIndex'].ingest_documents([pdf_doc_llama])
+            print(f"  ✓ LlamaIndex ingested PDF")
 
-                # Store for evaluation
-                ragas_sample = RAGEvaluationSample(
-                    user_input=question,
-                    reference=ground_truth,
-                    retrieved_contexts=response.context,
-                    response=response.answer,
-                    metadata={
-                        'provider': provider_name,
-                        'latency_ms': response.latency_ms,
-                        'question_id': sample.metadata['question_id'],
-                        'paper_id': paper_id
-                    }
+            # LandingAI: Original PDF
+            pdf_doc_landingai = Document(
+                id=paper_id,
+                content="",
+                metadata={'file_path': str(pdf_path), 'title': paper_title}
+            )
+            indices['LandingAI'] = adapters['LandingAI'].ingest_documents([pdf_doc_landingai])
+            print(f"  ✓ LandingAI ingested PDF")
+
+            # Reducto: Original PDF
+            pdf_doc_reducto = Document(
+                id=paper_id,
+                content="",
+                metadata={'file_path': str(pdf_path), 'title': paper_title}
+            )
+            indices['Reducto'] = adapters['Reducto'].ingest_documents([pdf_doc_reducto])
+            print(f"  ✓ Reducto ingested PDF")
+
+            # Step 4: Query ALL 3 providers with this paper's questions
+            print(f"\n📝 Querying ALL 3 providers ({len(samples)} questions for this paper)...")
+            print("=" * 80)
+
+            for i, sample in enumerate(samples, 1):
+                question = sample.question
+                ground_truth = sample.ground_truth
+
+                print(f"\n❓ Question {i}: {question}")
+                print(f"   Ground Truth: {ground_truth[:100]}...")
+                print()
+
+                # Log question and ground truth (full text)
+                rag_logger.log_question(
+                    question_num=i,
+                    question=question,
+                    ground_truth=ground_truth,
+                    question_id=sample.metadata.get('question_id')
                 )
-                provider_samples[provider_name].append(ragas_sample)
 
-            print("-" * 80)
+                # Query each provider
+                for provider_name, adapter in adapters.items():
+                    response = adapter.query(question, indices[provider_name])
+
+                    print(f"   {provider_name}:")
+                    print(f"     Answer: {response.answer[:100]}...")
+                    print(f"     Latency: {response.latency_ms:.0f}ms | Chunks: {len(response.context)}")
+
+                    # Log complete provider response
+                    rag_logger.log_provider_response(
+                        provider_name=provider_name,
+                        answer=response.answer,
+                        context_chunks=response.context,
+                        latency_ms=response.latency_ms,
+                        metadata=response.metadata
+                    )
+
+                    # Store for evaluation
+                    ragas_sample = RAGEvaluationSample(
+                        user_input=question,
+                        reference=ground_truth,
+                        retrieved_contexts=response.context,
+                        response=response.answer,
+                        metadata={
+                            'provider': provider_name,
+                            'latency_ms': response.latency_ms,
+                            'question_id': sample.metadata['question_id'],
+                            'paper_id': paper_id
+                        }
+                    )
+                    provider_samples[provider_name].append(ragas_sample)
+
+                print("-" * 80)
 
         # Step 5: Evaluate ALL providers with Ragas
         print("\n" + "=" * 80)
         print("📊 RAGAS EVALUATION - Per Provider")
         print("=" * 80)
+
+        rag_logger.log_section("RAGAS EVALUATION")
 
         provider_scores = {}
         for provider_name, samples_list in provider_samples.items():
@@ -237,6 +316,9 @@ class TestQasperRAGRace:
             print(f"  {provider_name} Scores:")
             for metric, score in eval_result.scores.items():
                 print(f"    {metric}: {score:.4f}")
+
+        # Log aggregated scores
+        rag_logger.log_aggregated_scores(provider_scores)
 
         # Step 6: Compare and declare winner
         print("\n" + "=" * 80)
@@ -275,23 +357,31 @@ class TestQasperRAGRace:
             count = winner_counts[provider_name]
             print(f"  {provider_name}: {count} 🥇")
 
+        # Log winner
+        rag_logger.log_winner(
+            winner=final_winner,
+            winner_counts=winner_counts,
+            total_metrics=len(metrics)
+        )
+
         # No cleanup needed - using original PDF from arxiv
 
         print("\n" + "=" * 80)
         print("✅ RAGRACE COMPLETE!")
+        print(f"   Tested: {len(papers_to_test)} papers, {total_questions} questions")
         print("=" * 80)
+
+        # Close logger
+        rag_logger.close()
 
         # Assertions
         assert len(provider_scores) == 3, "Should have scores for all 3 providers"
         for provider_name in adapters.keys():
             assert provider_name in provider_scores
             assert len(provider_scores[provider_name]) > 0
-
-        return {
-            'winner': final_winner,
-            'scores': provider_scores,
-            'questions': len(samples)
-        }
+            # Verify each provider was tested on all questions
+            assert len(provider_samples[provider_name]) == total_questions, \
+                f"{provider_name} should have {total_questions} samples"
 
 
 if __name__ == "__main__":
