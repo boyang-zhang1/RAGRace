@@ -11,7 +11,9 @@ providers:
 
   - name: reducto
     api_doc_url: https://docs.reducto.ai/quickstart
-    
+
+  - name: extendai
+    api_doc_url: https://docs.extend.ai/2025-04-21/developers/getting-started
   # Add more providers here with just name and api_doc_url
   # - name: your_provider
   #   api_doc_url: https://your-provider.com/docs

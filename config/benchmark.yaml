@@ -1,0 +1,71 @@
+# RAGRace Benchmark Configuration
+# This file drives the entire benchmark orchestration
+
+benchmark:
+  # Dataset configuration
+  dataset:
+    name: qasper                      # Dataset type (currently only qasper supported)
+    split: train                       # train | validation | test
+    max_papers: 2                      # Limit for testing (null = all papers)
+    max_questions_per_paper: 3         # Questions per paper (null = all questions)
+    filter_unanswerable: true          # Skip unanswerable questions
+
+  # Provider selection
+  # Add/remove providers from this list to change which ones are tested
+  providers:
+    - llamaindex
+    - landingai
+    - reducto
+
+  # Execution parameters
+  execution:
+    max_provider_workers: 3   # Concurrent providers per paper (3 = max parallelism)
+    max_paper_workers: 1      # Papers processed concurrently (1 = sequential)
+
+  # Timeout configuration (seconds)
+  # Increase these if working with very large documents
+  timeouts:
+    provider_init: 30
+    document_ingest: 300
+    query: 60
+    evaluation: 120
+
+  # Retry/resilience configuration
+  # Future feature: auto-retry failed operations
+  retry:
+    max_attempts: 3
+    delay_seconds: 5
+    exponential_backoff: true
+
+  # Output configuration
+  output:
+    results_dir: data/results         # Base directory for all results
+    save_intermediate: true           # Save after each provider completes
+    resume_enabled: true              # Skip already-completed papers
+
+  # Ragas evaluation configuration
+  evaluation:
+    model: gpt-4o-mini                # LLM for evaluation
+    api_key_env: OPENAI_API_KEY       # Environment variable for API key
+    metrics:
+      - faithfulness                  # Is answer grounded in context?
+      - factual_correctness           # Does answer match ground truth?
+      - context_recall                # Was relevant context retrieved?
+
+  # Provider-specific configurations
+  # Each provider has its own initialization parameters
+  provider_configs:
+    llamaindex:
+      top_k: 3                              # Number of chunks to retrieve
+      api_key_env: OPENAI_API_KEY           # For embeddings and LLM
+      cloud_api_key_env: LLAMAINDEX_API_KEY # For LlamaCloud
+
+    landingai:
+      top_k: 3
+      api_key_env: VISION_AGENT_API_KEY     # LandingAI API key
+      openai_api_key_env: OPENAI_API_KEY    # For embeddings and LLM
+
+    reducto:
+      top_k: 3
+      api_key_env: REDUCTO_API_KEY          # Reducto API key
+      openai_api_key_env: OPENAI_API_KEY    # For embeddings and LLM

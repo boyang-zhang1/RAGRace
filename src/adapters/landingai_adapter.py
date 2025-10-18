@@ -184,7 +184,7 @@ class LandingAIAdapter(BaseAdapter):
             index_id: Index identifier from ingest_documents()
             **kwargs: Additional options:
                 - top_k: Override default top_k
-                - temperature: LLM temperature (default: 0)
+                - temperature: LLM temperature (default: 1.0, gpt-4o-mini only supports 1.0)
 
         Returns:
             RAGResponse: Answer, context chunks, and metadata
@@ -200,7 +200,7 @@ class LandingAIAdapter(BaseAdapter):
             raise KeyError(f"Index {index_id} not found")
 
         top_k = kwargs.get("top_k", self._top_k)
-        temperature = kwargs.get("temperature", 0)
+        temperature = kwargs.get("temperature", 1.0)
 
         logger.info(f"Querying index {index_id} with question: {question[:50]}...")
 
@@ -407,7 +407,7 @@ class LandingAIAdapter(BaseAdapter):
         similarities = np.dot(doc_norms, query_norm)
         return similarities
 
-    def _generate_answer(self, question: str, context_chunks: List[str], temperature: float = 0) -> str:
+    def _generate_answer(self, question: str, context_chunks: List[str], temperature: float = 1.0) -> str:
         """
         Generate answer using OpenAI LLM with retrieved context.
 

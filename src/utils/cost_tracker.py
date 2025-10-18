@@ -28,7 +28,7 @@ OPENAI_PRICING = {
         'input': 0.150 / 1_000_000,   # $0.150 per 1M tokens
         'output': 0.600 / 1_000_000,  # $0.600 per 1M tokens
     },
-    'gpt-4o': {
+    'gpt-5': {
         'input': 2.50 / 1_000_000,    # $2.50 per 1M tokens
         'output': 10.00 / 1_000_000,  # $10.00 per 1M tokens
     },

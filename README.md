@@ -1,12 +1,10 @@
 # RAGRace
 
-A comprehensive platform for comparing and benchmarking different RAG (Retrieval-Augmented Generation) APIs and services.
+**Benchmark and compare RAG providers on real-world datasets with one command.**
 
-## Overview
+RAGRace provides an automated benchmark framework to evaluate RAG providers on academic papers, Wikipedia articles, and more. All providers are tested on identical documents with standardized evaluation metrics (Ragas) for fair comparison.
 
-RAGRace provides a standardized framework to evaluate and compare RAG providers using unified interfaces and automated scoring. The platform supports multiple providers with a consistent `BaseAdapter` interface for fair, apples-to-apples comparison.
-
-**Current Status**: 3 RAG providers integrated with 54+ passing tests. Complete end-to-end evaluation on Qasper dataset (1,585 research papers with 5,049 questions).
+**Current Status**: Checkpoint 5 Complete - Full orchestrator pipeline with 3 RAG providers, automated benchmarking on Qasper (1,585 research papers) and SQuAD 2.0 datasets.
 
 ## Integrated Providers
 
@@ -18,7 +16,7 @@ RAGRace provides a standardized framework to evaluate and compare RAG providers 
 
 ## Quick Start
 
-### Installation
+### 1. Installation
 
 ```bash
 # Clone repository
@@ -29,140 +27,224 @@ cd RAGRace
 pip install -r requirements.txt
 ```
 
-### Configuration
+### 2. API Keys Setup
 
 ```bash
 # Copy environment template
 cp .env.example .env
 
-# Add your API keys to .env
-OPENAI_API_KEY=your_openai_key_here
-VISION_AGENT_API_KEY=your_landingai_key_here  # For LandingAI
-REDUCTO_API_KEY=your_reducto_key_here          # For Reducto
+# Edit .env and add your API keys:
+# OPENAI_API_KEY=sk-...                    # Required for all providers
+# VISION_AGENT_API_KEY=va-...              # For LandingAI (optional)
+# REDUCTO_API_KEY=red-...                   # For Reducto (optional)
 ```
 
-### Basic Usage
+**Note**: You only need OpenAI API key to run LlamaIndex. Add other keys only if testing those providers.
 
-```python
-from src.adapters import LlamaIndexAdapter, Document
-import os
+### 3. Run Your First Benchmark
 
-# Initialize adapter
-adapter = LlamaIndexAdapter()
-adapter.initialize(api_key=os.getenv("OPENAI_API_KEY"))
+```bash
+# Quick test: 1 paper, 1 question per paper (~2 minutes, ~$0.20)
+python scripts/run_benchmark.py --papers 1 --questions 1
 
-# Prepare documents
-docs = [
-    Document(
-        id="doc1",
-        content="Your document text here...",
-        metadata={"source": "example"}
-    )
-]
+# Small benchmark: 2 papers, 3 questions each (~5 minutes, ~$1.00)
+python scripts/run_benchmark.py --papers 2 --questions 3
 
-# Ingest documents
-index_id = adapter.ingest_documents(docs)
+# Test specific providers only
+python scripts/run_benchmark.py --papers 1 --questions 1 --providers llamaindex
+```
 
-# Query
-response = adapter.query("What is this document about?", index_id)
+**What happens when you run this?**
+1. Downloads Qasper dataset from HuggingFace (first run only)
+2. Downloads research paper PDFs from arxiv (cached locally)
+3. Runs 3 RAG providers in parallel on the same papers
+4. Evaluates with Ragas metrics (faithfulness, factual correctness, context recall)
+5. Saves structured results to `data/results/run_YYYYMMDD_HHMMSS/`
 
-# Get results
-print(f"Answer: {response.answer}")
-print(f"Context chunks: {len(response.context)}")
-print(f"Latency: {response.latency_ms:.2f}ms")
+### 4. View Results
+
+```bash
+# Results are saved in structured JSON format
+cat data/results/run_*/summary.json
+
+# Each paper has detailed provider results
+cat data/results/run_*/papers/1909.00694/llamaindex_results.json
+```
+
+**Result Structure**:
+```
+data/results/run_20251018_103045/
+├── papers/
+│   ├── 1909.00694/                    # Per-paper results
+│   │   ├── llamaindex_results.json    # LlamaIndex results + Ragas scores
+│   │   ├── landingai_results.json     # LandingAI results + Ragas scores
+│   │   └── reducto_results.json       # Reducto results + Ragas scores
+│   └── ...
+├── summary.json                        # Aggregated metrics across all papers
+└── benchmark_config.yaml               # Config snapshot for reproducibility
 ```
 
 ## Datasets
 
 RAGRace supports multiple datasets for evaluation:
 
-| Dataset | Type | Papers | Questions | Format | Status |
-|---------|------|--------|-----------|--------|--------|
-| **SQuAD 2.0** | Q&A on Wikipedia | - | 150K+ | Text paragraphs | ✅ Integrated |
-| **Qasper** | Q&A on Research Papers | 1,585 | 5,049 | Original PDFs from arxiv | ✅ Integrated |
+| Dataset | Type | Papers | Questions | Download | Status |
+|---------|------|--------|-----------|----------|--------|
+| **Qasper** | Q&A on Research Papers | 1,585 | 5,049 | Auto from arxiv | ✅ Default |
+| **SQuAD 2.0** | Q&A on Wikipedia | - | 150K+ | Auto from HuggingFace | ✅ Supported |
 
-### Qasper Dataset
+### Dataset Download (Automatic)
 
-Complete integration with original research papers:
+**No manual download needed!** Datasets are automatically downloaded on first run:
 
-```python
-from src.datasets.loader import DatasetLoader
+1. **Qasper (default)**:
+   - Metadata downloaded from HuggingFace (`.parquet` files)
+   - PDFs downloaded from arxiv on-demand (cached in `data/datasets/Qasper/pdfs/`)
+   - Rate-limited to respect arxiv (3s between downloads)
 
-# Load Qasper papers with questions
-dataset = DatasetLoader.load_qasper(
-    split='train',
-    max_papers=10,  # None = all 888 papers
-    filter_unanswerable=True
-)
+2. **SQuAD 2.0**:
+   - JSON files downloaded from HuggingFace if needed
+   - Cached in `data/datasets/SQuAD2/`
 
-# Each sample contains:
-# - question: Research question about the paper
-# - context: Raw PDF text (realistic, with formatting artifacts)
-# - ground_truth: Expert-annotated answer
-# - metadata: paper_id, pdf_path, question_id, etc.
+**Storage locations:**
+```
+data/datasets/
+├── Qasper/
+│   ├── dataset.yaml          # Metadata (committed to git)
+│   ├── cache/*.parquet       # HuggingFace dataset cache (NOT in git)
+│   └── pdfs/*.pdf            # Downloaded PDFs (NOT in git)
+└── SQuAD2/
+    ├── dataset.yaml          # Metadata (committed to git)
+    └── *.json                # Dataset files (NOT in git)
 ```
 
-**Features:**
-- Downloads original PDFs from arxiv (cached locally)
-- 888 train papers, 281 validation, 416 test
-- Questions asked by regular readers, answered by NLP practitioners
-- Tests RAG on long-form scientific documents (10K+ tokens)
+**Cache behavior:**
+- First run: Downloads datasets and PDFs (~5-10 minutes for 10 papers)
+- Subsequent runs: Uses cached files (instant)
+- Failed downloads: Automatically skipped (benchmark continues)
 
-## Running Tests
+### Qasper Dataset Details
+
+**Why Qasper?**
+- **Real research papers**: Full-length NLP papers from arxiv (10K+ tokens)
+- **Expert annotations**: Questions by readers, answers by NLP practitioners
+- **Diverse questions**: Extractive, abstractive, boolean, unanswerable
+- **Evidence grounding**: Answers linked to paper sections
+- **Realistic challenge**: Tests RAG on long-form scientific documents
+
+**Dataset splits:**
+- Train: 888 papers, ~2,850 questions
+- Validation: 281 papers, ~900 questions
+- Test: 416 papers, ~1,300 questions
+
+## Advanced Usage
+
+### Benchmark Configuration
+
+Edit `config/benchmark.yaml` to customize:
+
+```yaml
+benchmark:
+  dataset:
+    name: qasper                       # qasper | squad2
+    split: train                       # train | validation | test
+    max_papers: 2                      # Limit papers (null = all)
+    max_questions_per_paper: 3         # Questions per paper (null = all)
+
+  providers:                           # Add/remove providers
+    - llamaindex
+    - landingai
+    - reducto
+
+  execution:
+    max_provider_workers: 3            # Parallel providers per paper
+    max_paper_workers: 1               # Parallel papers (sequential by default)
+```
+
+### CLI Options
 
 ```bash
-# Run unit tests (fast, no API calls)
+# Override config file settings
+python scripts/run_benchmark.py --papers 10 --questions 5
+
+# Test specific providers
+python scripts/run_benchmark.py --providers llamaindex reducto
+
+# Use different dataset
+python scripts/run_benchmark.py --dataset squad2
+
+# Change parallelism
+python scripts/run_benchmark.py --workers 2
+
+# Custom output directory
+python scripts/run_benchmark.py --output-dir my_results
+
+# Resume interrupted benchmark
+python scripts/run_benchmark.py --resume run_20251018_103045
+```
+
+### Cost Estimation
+
+**Per paper (3 providers, 3 questions):**
+- Document parsing: ~$0.10 (PDF → chunks)
+- Query processing: ~$0.15 (3 questions × 3 providers)
+- Ragas evaluation: ~$0.25 (3 questions × 3 metrics × 3 providers)
+- **Total: ~$0.50 per paper**
+
+**Common benchmarks:**
+- 1 paper, 1 question: ~$0.20 (quick test)
+- 10 papers, 3 questions: ~$5.00 (small benchmark)
+- 100 papers, all questions: ~$50+ (full evaluation)
+
+### Development Testing
+
+For development, use pytest to run unit tests (no API costs):
+
+```bash
+# Run all unit tests (fast, no API calls)
 pytest tests/ -v -k "not integration"
 
 # Run integration tests (real API calls, costs money)
 pytest tests/ -v -m integration -s
-
-# Run RAGRace comparison on Qasper (3 providers, 1 paper, 3 questions)
-pytest tests/test_qasper_rag_e2e.py -v -s -m integration
 ```
-
-### RAGRace End-to-End Test
-
-Complete 3-way provider comparison on Qasper dataset:
-
-```bash
-pytest tests/test_qasper_rag_e2e.py::TestQasperRAGRace::test_ragrace_3_providers_qasper -v -s -m integration
-```
-
-**Customize paper/question count:**
-
-Edit `tests/test_qasper_rag_e2e.py` lines 102-103:
-
-```python
-max_papers = 1      # Change to 10 for 10 papers
-max_questions = 3   # Change to None for all questions, or 10 for 10 questions
-```
-
-**Examples:**
-- `max_papers=1, max_questions=3` → 1 paper, 3 questions (~2 min, $0.20)
-- `max_papers=5, max_questions=10` → 5 papers, 10 questions per paper (~15 min, $2)
-- `max_papers=10, max_questions=None` → 10 papers, ALL questions (~30 min, $5)
-- `max_papers=None, max_questions=None` → ALL 888 papers, ALL questions (EXPENSIVE!)
 
 ## Project Structure
 
 ```
 RAGRace/
+├── scripts/
+│   └── run_benchmark.py      # ⭐ CLI entry point for benchmarks
+├── config/
+│   ├── benchmark.yaml        # Benchmark configuration
+│   ├── providers.yaml        # Provider registry (human-maintained)
+│   └── providers.generated.yaml  # Provider configs (AI-generated)
 ├── src/
-│   ├── adapters/          # RAG provider adapters
-│   │   ├── base.py        # BaseAdapter interface
+│   ├── core/                 # Core pipeline components
+│   │   ├── orchestrator.py   # Main benchmark coordinator
+│   │   ├── adapter_factory.py    # Provider instantiation
+│   │   ├── provider_executor.py  # Parallel execution
+│   │   ├── paper_processor.py    # Document processing
+│   │   ├── result_saver.py       # Results management
+│   │   ├── ragas_evaluator.py    # Ragas metrics
+│   │   └── schemas.py            # Data structures
+│   ├── adapters/             # RAG provider adapters
+│   │   ├── base.py           # BaseAdapter interface
 │   │   ├── llamaindex_adapter.py
 │   │   ├── landingai_adapter.py
 │   │   └── reducto_adapter.py
-│   ├── core/              # Scoring and evaluation
-│   └── datasets/          # Dataset loaders
-├── tests/                 # Unit and integration tests
-├── config/                # Provider configurations
-├── docs/                  # Documentation
-│   ├── ARCHITECTURE.md    # System architecture
-│   ├── ADAPTERS.md        # Adapter specifications
-│   └── DEVELOPMENT.md     # Development guide
-└── data/                  # Datasets and results
+│   └── datasets/             # Dataset loaders
+│       ├── loader.py         # Main loader
+│       └── preprocessors/    # Dataset-specific preprocessing
+├── tests/                    # Unit and integration tests
+├── data/
+│   ├── datasets/             # Downloaded datasets (auto-cached)
+│   │   ├── Qasper/
+│   │   └── SQuAD2/
+│   └── results/              # Benchmark results (timestamped)
+└── docs/                     # Documentation
+    ├── ARCHITECTURE.md       # System architecture
+    ├── ADAPTERS.md           # Adapter specifications
+    └── DEVELOPMENT.md        # Development guide
 ```
 
 ## Documentation
@@ -174,13 +256,28 @@ RAGRace/
 
 ## Key Features
 
-- ✅ **Standardized Interface**: All providers implement `BaseAdapter` for fair comparison
-- ✅ **Comprehensive Testing**: 54+ tests with real API validation
-- ✅ **Multiple Providers**: LlamaIndex, LandingAI, Reducto (more coming)
-- ✅ **Dataset Support**: SQuAD 2.0 + Qasper (research papers) with Ragas evaluation
-- ✅ **End-to-End RAGRace**: Complete 3-way comparison on original PDFs
-- ✅ **Fair Evaluation**: All providers tested on SAME PDF format with SAME questions
-- ✅ **Web Research**: Uses Playwright MCP to read actual API documentation
+### ✅ Checkpoint 5: Full Orchestrator Pipeline
+
+- **One-Command Benchmarking**: `python scripts/run_benchmark.py --papers 10`
+- **Parallel Execution**: Run multiple providers simultaneously on each paper
+- **Resume Capability**: Interrupt and resume benchmarks without re-processing
+- **Auto Dataset Download**: Qasper PDFs and metadata downloaded on-demand
+- **Structured Results**: Per-paper, per-provider JSON with aggregated summary
+- **Cost Tracking**: Token usage and API costs per provider
+
+### 🎯 Evaluation & Fairness
+
+- **Ragas Metrics**: Faithfulness, Factual Correctness, Context Recall
+- **Fair Comparison**: All providers tested on identical PDFs with identical questions
+- **Standardized Interface**: All providers implement `BaseAdapter`
+- **Real Documents**: Full-length research papers (10K+ tokens), not toy examples
+
+### 🔧 Technical
+
+- **3 RAG Providers**: LlamaIndex, LandingAI, Reducto
+- **2 Datasets**: Qasper (1,585 papers), SQuAD 2.0 (150K questions)
+- **54+ Tests**: Unit and integration tests with real API validation
+- **Web Research**: Uses Playwright MCP to read actual API documentation (NO IMAGINATION)
 
 ## Development
 

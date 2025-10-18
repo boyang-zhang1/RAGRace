@@ -11,6 +11,7 @@ Logs all RAG operations to file for debugging and analysis:
 
 import logging
 import json
+import threading
 from pathlib import Path
 from datetime import datetime
 from typing import Dict, List, Any, Optional
@@ -24,6 +25,7 @@ class RAGLogger:
     - Human-readable format
     - Complete data (no truncation)
     - Structured sections for easy parsing
+    - Thread-safe logging (uses threading.Lock)
     """
 
     def __init__(self, log_dir: str = "data/results", test_name: str = "ragrace"):
@@ -40,6 +42,9 @@ class RAGLogger:
         # Create timestamped log file
         timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
         self.log_file = self.log_dir / f"{test_name}_{timestamp}.log"
+
+        # Thread safety lock
+        self._lock = threading.Lock()
 
         # Set up file handler
         self.logger = logging.getLogger(f"RAGLogger_{timestamp}")
@@ -72,20 +77,22 @@ class RAGLogger:
             title: Section title
             level: Header level (1=major, 2=minor, 3=sub)
         """
-        if level == 1:
-            self.logger.info("=" * 80)
-            self.logger.info(f" {title}")
-            self.logger.info("=" * 80)
-        elif level == 2:
-            self.logger.info("-" * 80)
-            self.logger.info(f" {title}")
-            self.logger.info("-" * 80)
-        else:
-            self.logger.info(f"\n### {title}")
+        with self._lock:
+            if level == 1:
+                self.logger.info("=" * 80)
+                self.logger.info(f" {title}")
+                self.logger.info("=" * 80)
+            elif level == 2:
+                self.logger.info("-" * 80)
+                self.logger.info(f" {title}")
+                self.logger.info("-" * 80)
+            else:
+                self.logger.info(f"\n### {title}")
 
     def log(self, message: str):
-        """Log a message."""
-        self.logger.info(message)
+        """Log a message (thread-safe)."""
+        with self._lock:
+            self.logger.info(message)
 
     def log_paper(self, paper_id: str, paper_title: str, pdf_path: str,
                    pdf_size: int, num_questions: int, metadata: Optional[Dict] = None):

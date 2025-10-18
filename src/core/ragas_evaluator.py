@@ -75,14 +75,14 @@ class RagasEvaluator:
 
         # Initialize metrics
         metric_names = config.get('metrics', ['faithfulness', 'factual_correctness', 'context_recall'])
-        self.metrics = self._init_metrics(metric_names)
+        self.metrics = self._init_metrics(metric_names, self.evaluator_llm)
 
-    def _init_metrics(self, metric_names: List[str]) -> List[Any]:
-        """Initialize Ragas metrics from names."""
+    def _init_metrics(self, metric_names: List[str], llm: Any) -> List[Any]:
+        """Initialize Ragas metrics from names with LLM set."""
         metric_map = {
-            'faithfulness': Faithfulness(),
-            'factual_correctness': FactualCorrectness(),
-            'context_recall': LLMContextRecall(),
+            'faithfulness': Faithfulness(llm=llm),
+            'factual_correctness': FactualCorrectness(llm=llm),
+            'context_recall': LLMContextRecall(llm=llm),
         }
 
         metrics = []
