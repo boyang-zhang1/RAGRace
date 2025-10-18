@@ -2,7 +2,7 @@
 RAG Logger - Comprehensive file logging for RAGRace tests.
 
 Logs all RAG operations to file for debugging and analysis:
-- Paper metadata (PDF name, path, size, title)
+- Document metadata (PDF name, path, size, title)
 - Questions (full text, not truncated)
 - Ground truth answers (full text)
 - Provider responses (complete answers, all chunks, scores)
@@ -94,22 +94,22 @@ class RAGLogger:
         with self._lock:
             self.logger.info(message)
 
-    def log_paper(self, paper_id: str, paper_title: str, pdf_path: str,
-                   pdf_size: int, num_questions: int, metadata: Optional[Dict] = None):
+    def log_document(self, doc_id: str, doc_title: str, pdf_path: str,
+                     pdf_size: int, num_questions: int, metadata: Optional[Dict] = None):
         """
-        Log paper information.
+        Log document information.
 
         Args:
-            paper_id: Paper identifier (e.g., arxiv ID)
-            paper_title: Full paper title
+            doc_id: Document identifier (e.g., arxiv ID)
+            doc_title: Full document title
             pdf_path: Path to PDF file
             pdf_size: PDF file size in bytes
-            num_questions: Number of questions for this paper
+            num_questions: Number of questions for this document
             metadata: Additional metadata
         """
-        self.log_section(f"PAPER: {paper_id}", level=2)
-        self.log(f"ID: {paper_id}")
-        self.log(f"Title: {paper_title}")
+        self.log_section(f"DOCUMENT: {doc_id}", level=2)
+        self.log(f"ID: {doc_id}")
+        self.log(f"Title: {doc_title}")
         self.log(f"PDF Path: {pdf_path}")
         self.log(f"PDF Size: {pdf_size:,} bytes ({pdf_size / 1024 / 1024:.2f} MB)")
         self.log(f"Questions: {num_questions}")

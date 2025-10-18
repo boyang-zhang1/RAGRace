@@ -1,5 +1,5 @@
 """
-Paper processor - orchestrates parallel provider execution.
+Document processor - orchestrates parallel provider execution.
 
 This module:
 - Creates thread pool for parallel execution
@@ -13,17 +13,17 @@ from concurrent.futures import ThreadPoolExecutor, as_completed
 from typing import Dict, List, Callable, Optional, Any
 
 from src.adapters.base import BaseAdapter
-from src.core.schemas import PaperData, QuestionData, ProviderResult, PaperResult
+from src.core.schemas import DocumentData, QuestionData, ProviderResult, DocumentResult
 from src.core.ragas_evaluator import RagasEvaluator
 from src.core.provider_executor import ProviderExecutor
 
 
-class PaperProcessor:
-    """Processes a single paper with multiple providers in parallel."""
+class DocumentProcessor:
+    """Processes a single document with multiple providers in parallel."""
 
     def __init__(self, evaluator: RagasEvaluator, max_workers: int = 3):
         """
-        Initialize paper processor.
+        Initialize document processor.
 
         Args:
             evaluator: Ragas evaluator (shared across all providers)
@@ -33,43 +33,43 @@ class PaperProcessor:
         self.max_workers = max_workers
         self.executor_factory = ProviderExecutor
 
-    def process_paper(
+    def process_document(
         self,
-        paper: PaperData,
+        doc: DocumentData,
         questions: List[QuestionData],
         adapters: Dict[str, BaseAdapter],
         on_provider_complete: Optional[Callable[[ProviderResult], None]] = None
-    ) -> PaperResult:
+    ) -> DocumentResult:
         """
-        Execute all providers on this paper in parallel.
+        Execute all providers on this document in parallel.
 
         Workflow:
         1. Create thread pool (max_workers = num providers)
         2. Submit ProviderExecutor.execute() for each provider
         3. Collect results via as_completed() (save incrementally)
         4. Aggregate scores and determine winner
-        5. Return complete paper result
+        5. Return complete document result
 
         Args:
-            paper: Paper data with PDF path
+            doc: Document data with content (PDF path or text)
             questions: Questions to ask all providers
             adapters: Dict of initialized adapters {name: adapter}
             on_provider_complete: Optional callback when each provider finishes
 
         Returns:
-            PaperResult with all provider results and winner
+            DocumentResult with all provider results and winner
         """
         print(f"\n{'='*80}")
-        print(f"📄 Processing paper: {paper.paper_id}")
-        print(f"   Title: {paper.paper_title[:70]}...")
+        print(f"📄 Processing document: {doc.doc_id}")
+        print(f"   Title: {doc.doc_title[:70]}...")
         print(f"   Questions: {len(questions)}")
         print(f"   Providers: {list(adapters.keys())}")
         print(f"{'='*80}")
 
         # Initialize result
-        paper_result = PaperResult(
-            paper_id=paper.paper_id,
-            paper_title=paper.paper_title,
+        doc_result = DocumentResult(
+            doc_id=doc.doc_id,
+            doc_title=doc.doc_title,
             num_questions=len(questions),
             timestamp=datetime.now().isoformat()
         )
@@ -87,7 +87,7 @@ class PaperProcessor:
                     executor.execute,
                     provider_name=provider_name,
                     adapter=adapter,
-                    paper=paper,
+                    doc=doc,
                     questions=questions
                 )
                 future_to_provider[future] = provider_name
@@ -105,7 +105,7 @@ class PaperProcessor:
                     result: ProviderResult = future.result()
 
                     # Store result
-                    paper_result.providers[provider_name] = result
+                    doc_result.providers[provider_name] = result
                     completed_count += 1
 
                     # Log completion
@@ -130,22 +130,22 @@ class PaperProcessor:
                     # Create error result
                     error_result = ProviderResult(
                         provider=provider_name,
-                        paper_id=paper.paper_id,
+                        doc_id=doc.doc_id,
                         status="error",
                         error=f"Thread execution failed: {str(e)}",
                         timestamp_start=datetime.now().isoformat(),
                         timestamp_end=datetime.now().isoformat()
                     )
-                    paper_result.providers[provider_name] = error_result
+                    doc_result.providers[provider_name] = error_result
 
                     if on_provider_complete:
                         on_provider_complete(error_result)
 
         # Aggregate results and determine winner
         print(f"\n📊 Aggregating results...")
-        paper_result.winner = self._determine_winner(paper_result.providers)
+        doc_result.winner = self._determine_winner(doc_result.providers)
 
-        return paper_result
+        return doc_result
 
     def _determine_winner(self, provider_results: Dict[str, ProviderResult]) -> Dict[str, Any]:
         """

@@ -40,6 +40,7 @@ reportlab>=4.0.0
 datasets>=2.0.0
 arxiv>=2.0.0
 pypdf>=3.0.0
+playwright>=1.40.0  # HTML to PDF conversion (preserves document structure)
 
 # Add more providers as needed
 # landing-ai

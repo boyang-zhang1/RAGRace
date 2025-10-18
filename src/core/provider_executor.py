@@ -1,5 +1,5 @@
 """
-Provider executor - runs one RAG provider on one paper.
+Provider executor - runs one RAG provider on one document.
 
 This module executes in a thread and handles:
 - Document ingestion
@@ -13,12 +13,12 @@ from datetime import datetime
 from typing import List
 
 from src.adapters.base import BaseAdapter, Document, RAGResponse
-from src.core.schemas import PaperData, QuestionData, QuestionResult, ProviderResult
+from src.core.schemas import DocumentData, QuestionData, QuestionResult, ProviderResult
 from src.core.ragas_evaluator import RagasEvaluator, RAGEvaluationSample
 
 
 class ProviderExecutor:
-    """Executes a single provider on a single paper."""
+    """Executes a single provider on a single document."""
 
     def __init__(self, evaluator: RagasEvaluator):
         """
@@ -33,14 +33,14 @@ class ProviderExecutor:
         self,
         provider_name: str,
         adapter: BaseAdapter,
-        paper: PaperData,
+        doc: DocumentData,
         questions: List[QuestionData]
     ) -> ProviderResult:
         """
-        Execute complete provider workflow on one paper.
+        Execute complete provider workflow on one document.
 
         Workflow:
-        1. Ingest paper PDF
+        1. Ingest document (PDF or text)
         2. Query all questions
         3. Evaluate responses with Ragas
         4. Aggregate scores
@@ -52,7 +52,7 @@ class ProviderExecutor:
         Args:
             provider_name: Name of provider (for logging)
             adapter: Initialized adapter instance
-            paper: Paper data with PDF path
+            doc: Document data (PDF path or text content)
             questions: List of questions to ask
 
         Returns:
@@ -63,23 +63,37 @@ class ProviderExecutor:
 
         result = ProviderResult(
             provider=provider_name,
-            paper_id=paper.paper_id,
+            doc_id=doc.doc_id,
             status="pending",
             timestamp_start=timestamp_start
         )
 
         try:
-            # Step 1: Ingest paper PDF
-            doc = Document(
-                id=paper.paper_id,
-                content="",  # File-based providers use metadata.file_path
-                metadata={
-                    'file_path': str(paper.pdf_path),
-                    'title': paper.paper_title
-                }
-            )
+            # Step 1: Ingest document (PDF or text)
+            # For PDF-based datasets (Qasper): use file_path
+            # For text-based datasets (PolicyQA): use content
+            if doc.pdf_path is not None:
+                # PDF-based document
+                document = Document(
+                    id=doc.doc_id,
+                    content="",  # File-based providers use metadata.file_path
+                    metadata={
+                        'file_path': str(doc.pdf_path),
+                        'title': doc.doc_title
+                    }
+                )
+            else:
+                # Text-based document
+                document = Document(
+                    id=doc.doc_id,
+                    content=doc.metadata.get('content', ''),
+                    metadata={
+                        'title': doc.doc_title,
+                        'document_type': 'text'
+                    }
+                )
 
-            index_id = adapter.ingest_documents([doc])
+            index_id = adapter.ingest_documents([document])
             result.index_id = index_id
 
             # Step 2: Query all questions

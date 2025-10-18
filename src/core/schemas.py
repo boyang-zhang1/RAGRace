@@ -13,18 +13,24 @@ from pathlib import Path
 
 
 @dataclass
-class PaperData:
-    """Represents a single paper in the dataset."""
-    paper_id: str
-    paper_title: str
-    pdf_path: Path
-    pdf_size_bytes: int
+class DocumentData:
+    """
+    Represents a single document in the dataset.
+
+    Supports both PDF-based (Qasper) and text-based (PolicyQA) datasets:
+    - PDF-based: pdf_path is set, content in metadata is optional
+    - Text-based: pdf_path is None, content stored in metadata['content']
+    """
+    doc_id: str
+    doc_title: str
+    pdf_path: Optional[Path]  # None for text-based datasets
+    pdf_size_bytes: int  # File size for PDFs, text byte length for text-based
     metadata: Dict[str, Any] = field(default_factory=dict)
 
     def to_dict(self) -> Dict:
         """Convert to dict for JSON serialization."""
         d = asdict(self)
-        d['pdf_path'] = str(self.pdf_path)  # Path → str for JSON
+        d['pdf_path'] = str(self.pdf_path) if self.pdf_path else None  # Path → str for JSON
         return d
 
 
@@ -60,9 +66,9 @@ class QuestionResult:
 
 @dataclass
 class ProviderResult:
-    """Complete result for one provider on one paper."""
+    """Complete result for one provider on one document."""
     provider: str
-    paper_id: str
+    doc_id: str
     status: str  # "success" | "error"
     error: Optional[str] = None
     index_id: Optional[str] = None
@@ -76,7 +82,7 @@ class ProviderResult:
         """Convert to dict for JSON serialization."""
         return {
             'provider': self.provider,
-            'paper_id': self.paper_id,
+            'doc_id': self.doc_id,
             'status': self.status,
             'error': self.error,
             'index_id': self.index_id,
@@ -89,10 +95,10 @@ class ProviderResult:
 
 
 @dataclass
-class PaperResult:
-    """Aggregated results for all providers on one paper."""
-    paper_id: str
-    paper_title: str
+class DocumentResult:
+    """Aggregated results for all providers on one document."""
+    doc_id: str
+    doc_title: str
     num_questions: int
     providers: Dict[str, ProviderResult] = field(default_factory=dict)
     winner: Dict[str, Any] = field(default_factory=dict)  # {metric: provider_name}
@@ -101,8 +107,8 @@ class PaperResult:
     def to_dict(self) -> Dict:
         """Convert to dict for JSON serialization."""
         return {
-            'paper_id': self.paper_id,
-            'paper_title': self.paper_title,
+            'doc_id': self.doc_id,
+            'doc_title': self.doc_title,
             'num_questions': self.num_questions,
             'providers': {name: result.to_dict() for name, result in self.providers.items()},
             'winner': self.winner,
@@ -115,10 +121,10 @@ class RunSummary:
     """Overall benchmark run summary."""
     run_id: str
     config: Dict[str, Any]
-    num_papers: int
+    num_docs: int
     num_questions_total: int
     providers: List[str]
-    results: List[PaperResult] = field(default_factory=list)
+    results: List[DocumentResult] = field(default_factory=list)
     overall_winner: Dict[str, Any] = field(default_factory=dict)
     duration_seconds: float = 0.0
     timestamp_start: str = ""
@@ -129,7 +135,7 @@ class RunSummary:
         return {
             'run_id': self.run_id,
             'config': self.config,
-            'num_papers': self.num_papers,
+            'num_docs': self.num_docs,
             'num_questions_total': self.num_questions_total,
             'providers': self.providers,
             'results': [r.to_dict() for r in self.results],

@@ -1,0 +1,30 @@
+# PolicyQA Dataset Metadata
+
+name: PolicyQA
+version: "1.0"
+type: privacy_policy_qa
+source: https://github.com/wasiahmad/PolicyQA
+
+description: >
+  Privacy policy QA dataset. 25,017 questions from 115 website privacy policies.
+  Tests RAG on legal/compliance domain text.
+
+splits:
+  train: ~20k questions
+  dev: ~2.5k questions
+  test: ~2.5k questions
+
+structure:
+  format: SQuAD v1.0 JSON
+  documents: HTML privacy policies → converted to PDF
+  answers: extractive text spans
+
+usage:
+  loader: DatasetLoader.load_policyqa(split='train', max_samples=10)
+  preprocessor: PolicyQAPreprocessor
+  notes: HTML policies automatically converted to PDF for RAG providers
+
+data_storage:
+  json_files: *.json (Q&A data, downloaded from GitHub)
+  html_files: original_policies/*.html, sanitized_policies/*.html
+  pdf_files: pdfs/*.pdf (auto-generated from HTML, cached)

@@ -9,6 +9,7 @@ from pathlib import Path
 from .preprocessors.base import BasePreprocessor, ProcessedDataset
 from .preprocessors.squad import SquadPreprocessor
 from .preprocessors.qasper_preprocessor import QasperPreprocessor
+from .preprocessors.policyqa_preprocessor import PolicyQAPreprocessor
 
 
 class DatasetLoader:
@@ -25,6 +26,7 @@ class DatasetLoader:
         'squad': SquadPreprocessor,
         'squad2': SquadPreprocessor,
         'qasper': QasperPreprocessor,
+        'policyqa': PolicyQAPreprocessor,
     }
 
     def __init__(self, dataset_type: str):
@@ -59,8 +61,11 @@ class DatasetLoader:
                     - max_samples: int = None
                 For Qasper:
                     - split: str = 'train'
-                    - max_papers: int = None
+                    - max_docs: int = None
                     - filter_unanswerable: bool = True
+                For PolicyQA:
+                    - split: str = 'train'
+                    - max_samples: int = None
 
         Returns:
             ProcessedDataset with standardized samples
@@ -105,18 +110,41 @@ class DatasetLoader:
         Args:
             split: Dataset split ('train', 'validation', 'test')
             **kwargs: Qasper preprocessor options
-                - max_papers: int = None (None = all papers, or set limit for testing)
+                - max_docs: int = None (None = all docs, or set limit for testing)
                 - filter_unanswerable: bool = True
 
         Returns:
             ProcessedDataset with Qasper samples (questions + raw PDF text)
 
         Example:
-            # Load all papers from train split
+            # Load all documents from train split
             dataset = DatasetLoader.load_qasper(split='train')
 
-            # Load first 10 papers for quick testing
-            dataset = DatasetLoader.load_qasper(split='train', max_papers=10)
+            # Load first 10 documents for quick testing
+            dataset = DatasetLoader.load_qasper(split='train', max_docs=10)
         """
         loader = DatasetLoader('qasper')
+        return loader.load(file_path=None, split=split, **kwargs)
+
+    @staticmethod
+    def load_policyqa(split: str = "train", **kwargs) -> ProcessedDataset:
+        """
+        Convenience method to load PolicyQA dataset.
+
+        Args:
+            split: Dataset split ('train', 'dev', 'test')
+            **kwargs: PolicyQA preprocessor options
+                - max_samples: int = None (None = all samples, or set limit for testing)
+
+        Returns:
+            ProcessedDataset with PolicyQA samples (privacy policy QA)
+
+        Example:
+            # Load all samples from train split
+            dataset = DatasetLoader.load_policyqa(split='train')
+
+            # Load first 10 samples for quick testing
+            dataset = DatasetLoader.load_policyqa(split='train', max_samples=10)
+        """
+        loader = DatasetLoader('policyqa')
         return loader.load(file_path=None, split=split, **kwargs)

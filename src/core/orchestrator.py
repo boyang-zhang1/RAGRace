@@ -5,7 +5,7 @@ Coordinates:
 - Configuration loading
 - Dataset loading
 - Adapter initialization
-- Paper processing
+- Document processing
 - Result aggregation
 """
 
@@ -17,10 +17,10 @@ from collections import defaultdict
 from typing import Dict, List, Tuple
 
 from src.datasets.loader import DatasetLoader
-from src.core.schemas import PaperData, QuestionData, RunSummary
+from src.core.schemas import DocumentData, QuestionData, RunSummary
 from src.core.adapter_factory import AdapterFactory
 from src.core.ragas_evaluator import RagasEvaluator
-from src.core.paper_processor import PaperProcessor
+from src.core.document_processor import DocumentProcessor
 from src.core.result_saver import ResultSaver
 
 
@@ -32,7 +32,7 @@ class Orchestrator:
         Initialize orchestrator.
 
         Args:
-            config_path: Path to benchmark.yaml config file
+            config_path: Path to benchmark config file (e.g., config/benchmark_qasper.yaml)
         """
         self.config_path = Path(config_path)
         self.config = self._load_config()
@@ -64,10 +64,10 @@ class Orchestrator:
         Execute complete benchmark.
 
         Workflow:
-        1. Load dataset (papers + questions)
+        1. Load dataset (docs + questions)
         2. Initialize all adapters
-        3. For each paper:
-           - PaperProcessor.process_paper() → parallel providers
+        3. For each doc:
+           - DocumentProcessor.process_doc() → parallel providers
            - Save results incrementally
         4. Generate run summary
         5. Return results
@@ -89,10 +89,10 @@ class Orchestrator:
 
         # Step 1: Load dataset
         print(f"\n📥 Loading dataset...")
-        papers, questions_by_paper = self._load_dataset()
+        docs, questions_by_doc = self._load_dataset()
 
-        total_questions = sum(len(qs) for qs in questions_by_paper.values())
-        print(f"   ✓ Loaded {len(papers)} papers, {total_questions} questions")
+        total_questions = sum(len(qs) for qs in questions_by_doc.values())
+        print(f"   ✓ Loaded {len(docs)} docs, {total_questions} questions")
 
         # Step 2: Initialize adapters
         print(f"\n📦 Initializing {len(self.provider_names)} providers...")
@@ -107,57 +107,57 @@ class Orchestrator:
         evaluator = RagasEvaluator(config=self.eval_config)
         print(f"   ✓ Ragas evaluator ready")
 
-        # Step 4: Process each paper
-        print(f"\n🔄 Processing papers...")
-        paper_processor = PaperProcessor(
+        # Step 4: Process each doc
+        print(f"\n🔄 Processing docs...")
+        doc_processor = DocumentProcessor(
             evaluator=evaluator,
             max_workers=self.execution_config['max_provider_workers']
         )
 
-        paper_results = []
+        doc_results = []
 
-        for i, paper in enumerate(papers, 1):
+        for i, doc in enumerate(docs, 1):
             print(f"\n{'='*80}")
-            print(f"Paper {i}/{len(papers)}: {paper.paper_id}")
+            print(f"Document {i}/{len(docs)}: {doc.doc_id}")
             print(f"{'='*80}")
 
             # Check if already completed (resume capability)
             if (self.output_config.get('resume_enabled', False) and
-                self.result_saver.paper_completed(paper.paper_id)):
+                self.result_saver.doc_completed(doc.doc_id)):
                 print(f"⏭️  Skipping (already completed)")
                 continue
 
-            # Get questions for this paper
-            questions = questions_by_paper[paper.paper_id]
+            # Get questions for this doc
+            questions = questions_by_doc[doc.doc_id]
 
-            # Process paper with all providers (parallel)
-            paper_result = paper_processor.process_paper(
-                paper=paper,
+            # Process doc with all providers (parallel)
+            doc_result = doc_processor.process_document(
+                doc=doc,
                 questions=questions,
                 adapters=adapters,
                 on_provider_complete=lambda result: self.result_saver.save_provider_result(result)
             )
 
-            # Save aggregated paper result
-            self.result_saver.save_paper_aggregated(paper_result)
+            # Save aggregated doc result
+            self.result_saver.save_document_aggregated(doc_result)
 
-            paper_results.append(paper_result)
+            doc_results.append(doc_result)
 
         # Step 5: Generate run summary
         print(f"\n📊 Generating run summary...")
         end_time = time.time()
         duration = end_time - start_time
 
-        # Determine overall winner (most metrics won across all papers)
-        overall_winner = self._determine_overall_winner(paper_results)
+        # Determine overall winner (most metrics won across all docs)
+        overall_winner = self._determine_overall_winner(doc_results)
 
         summary = RunSummary(
             run_id=self.result_saver.run_id,
             config=self.config,
-            num_papers=len(papers),
+            num_docs=len(docs),
             num_questions_total=total_questions,
             providers=self.provider_names,
-            results=paper_results,
+            results=doc_results,
             overall_winner=overall_winner,
             duration_seconds=duration,
             timestamp_start=timestamp_start,
@@ -172,55 +172,80 @@ class Orchestrator:
 
         return summary
 
-    def _load_dataset(self) -> Tuple[List[PaperData], Dict[str, List[QuestionData]]]:
+    def _load_dataset(self) -> Tuple[List[DocumentData], Dict[str, List[QuestionData]]]:
         """
-        Load dataset and group questions by paper.
+        Load dataset generically and group questions by document.
+
+        Supports any dataset type via config-driven DatasetLoader routing.
+        Groups questions by document:
+        - PDF-based datasets (Qasper): group by doc_id (one PDF per document)
+        - Text-based datasets (PolicyQA): group by unique context (one paragraph per document)
 
         Returns:
-            (papers, questions_by_paper)
-            - papers: List[PaperData]
-            - questions_by_paper: Dict[paper_id, List[QuestionData]]
+            (documents, questions_by_document)
+            - documents: List[DocumentData] (generic document data)
+            - questions_by_document: Dict[document_id, List[QuestionData]]
         """
         dataset_name = self.dataset_config['name']
 
-        if dataset_name == 'qasper':
-            dataset = DatasetLoader.load_qasper(
-                split=self.dataset_config.get('split', 'train'),
-                max_papers=self.dataset_config.get('max_papers'),
-                filter_unanswerable=self.dataset_config.get('filter_unanswerable', True)
-            )
-        else:
-            raise ValueError(f"Unsupported dataset: {dataset_name}")
+        # Generic dataset loading via DatasetLoader
+        # The loader routes to the correct preprocessor based on dataset name
+        loader = DatasetLoader(dataset_type=dataset_name)
 
-        # Group samples by paper
-        papers_dict = defaultdict(list)
+        # Build kwargs from config (filter out None values)
+        load_kwargs = {
+            k: v for k, v in self.dataset_config.items()
+            if k not in ['name'] and v is not None
+        }
+
+        dataset = loader.load(file_path=None, **load_kwargs)
+
+        # Generic grouping: determine strategy based on sample metadata
+        # If samples have 'doc_id' and 'pdf_path' → PDF-based (group by doc_id)
+        # Otherwise → text-based (group by unique context)
+
+        if dataset.samples and 'pdf_path' in dataset.samples[0].metadata:
+            # PDF-based dataset (Qasper)
+            documents, questions_by_doc = self._group_by_pdf(dataset)
+        else:
+            # Text-based dataset (PolicyQA, SQuAD)
+            documents, questions_by_doc = self._group_by_context(dataset)
+
+        return documents, questions_by_doc
+
+    def _group_by_pdf(self, dataset) -> Tuple[List[DocumentData], Dict[str, List[QuestionData]]]:
+        """Group PDF-based dataset samples by doc_id."""
+        from collections import defaultdict
+        import hashlib
+
+        docs_dict = defaultdict(list)
 
         for sample in dataset.samples:
-            paper_id = sample.metadata['paper_id']
-            papers_dict[paper_id].append(sample)
+            doc_id = sample.metadata['doc_id']
+            docs_dict[doc_id].append(sample)
 
-        # Limit questions per paper if configured
-        max_questions = self.dataset_config.get('max_questions_per_paper')
+        # Limit questions per doc if configured
+        max_questions = self.dataset_config.get('max_questions_per_doc') or \
+                       self.dataset_config.get('max_questions_per_document')
 
-        # Convert to PaperData and QuestionData
-        papers = []
-        questions_by_paper = {}
+        docs = []
+        questions_by_doc = {}
 
-        for paper_id, samples in papers_dict.items():
+        for doc_id, samples in docs_dict.items():
             # Limit questions
             if max_questions:
                 samples = samples[:max_questions]
 
-            # Create PaperData
+            # Create DocumentData
             first_sample = samples[0]
-            paper = PaperData(
-                paper_id=paper_id,
-                paper_title=first_sample.metadata['paper_title'],
+            doc = DocumentData(
+                doc_id=doc_id,
+                doc_title=first_sample.metadata.get('doc_title', doc_id),
                 pdf_path=Path(first_sample.metadata['pdf_path']),
                 pdf_size_bytes=Path(first_sample.metadata['pdf_path']).stat().st_size,
                 metadata=first_sample.metadata
             )
-            papers.append(paper)
+            docs.append(doc)
 
             # Create QuestionData list
             questions = [
@@ -232,24 +257,89 @@ class Orchestrator:
                 )
                 for i, sample in enumerate(samples)
             ]
-            questions_by_paper[paper_id] = questions
+            questions_by_doc[doc_id] = questions
 
-        return papers, questions_by_paper
+        return docs, questions_by_doc
 
-    def _determine_overall_winner(self, paper_results: List) -> Dict:
+    def _group_by_context(self, dataset) -> Tuple[List[DocumentData], Dict[str, List[QuestionData]]]:
+        """Group text-based dataset samples by unique context."""
+        from collections import defaultdict
+        import hashlib
+
+        # Group by context (each unique context = one document)
+        context_dict = defaultdict(list)
+        context_to_id = {}
+
+        for sample in dataset.samples:
+            # Create unique ID for this context
+            context_hash = hashlib.md5(sample.context.encode()).hexdigest()[:16]
+
+            # For PolicyQA: use website_title as prefix for readability
+            website_title = sample.metadata.get('website_title', 'doc')
+            doc_id = f"{website_title}_{context_hash}"
+
+            context_dict[doc_id].append(sample)
+            context_to_id[doc_id] = sample.context
+
+        # Limit questions per document if configured
+        max_questions = self.dataset_config.get('max_questions_per_doc') or \
+                       self.dataset_config.get('max_questions_per_document') or \
+                       self.dataset_config.get('max_samples')
+
+        documents = []
+        questions_by_doc = {}
+
+        for doc_id, samples in context_dict.items():
+            # Limit questions
+            if max_questions:
+                samples = samples[:max_questions]
+
+            # Create DocumentData (repurposed for text documents)
+            first_sample = samples[0]
+            context_text = first_sample.context
+
+            # Store text content in metadata since no PDF exists
+            document = DocumentData(
+                doc_id=doc_id,
+                doc_title=first_sample.metadata.get('website_title', doc_id),
+                pdf_path=None,  # No PDF for text-based datasets
+                pdf_size_bytes=len(context_text.encode()),  # Text size in bytes
+                metadata={
+                    **first_sample.metadata,
+                    'content': context_text,  # Store text content here
+                    'document_type': 'text'
+                }
+            )
+            documents.append(document)
+
+            # Create QuestionData list
+            questions = [
+                QuestionData(
+                    question_id=sample.metadata.get('question_id', f"q{i}"),
+                    question=sample.question,
+                    ground_truth=sample.ground_truth,
+                    metadata=sample.metadata
+                )
+                for i, sample in enumerate(samples)
+            ]
+            questions_by_doc[doc_id] = questions
+
+        return documents, questions_by_doc
+
+    def _determine_overall_winner(self, doc_results: List) -> Dict:
         """
-        Calculate average metric scores across all papers (no ranking).
+        Calculate average metric scores across all docs (no ranking).
 
         Returns:
             Dict with average scores for each provider
         """
         from collections import defaultdict
 
-        # Collect scores for each provider across all papers
+        # Collect scores for each provider across all docs
         provider_metric_scores = defaultdict(lambda: defaultdict(list))
 
-        for paper_result in paper_results:
-            provider_scores = paper_result.winner.get("provider_scores", {})
+        for doc_result in doc_results:
+            provider_scores = doc_result.winner.get("provider_scores", {})
             for provider, scores in provider_scores.items():
                 for metric, score in scores.items():
                     provider_metric_scores[provider][metric].append(score)
@@ -272,14 +362,14 @@ class Orchestrator:
         print(f"\n{'='*80}")
         print(f"🏆 BENCHMARK COMPLETE")
         print(f"{'='*80}")
-        print(f"Papers processed: {summary.num_papers}")
+        print(f"Documents processed: {summary.num_docs}")
         print(f"Total questions: {summary.num_questions_total}")
         print(f"Duration: {summary.duration_seconds:.1f}s")
 
         # Print average scores
         provider_avg_scores = summary.overall_winner.get("provider_avg_scores", {})
         if provider_avg_scores:
-            print(f"\n📊 Overall Average Scores (across {summary.num_papers} papers):")
+            print(f"\n📊 Overall Average Scores (across {summary.num_docs} docs):")
             for provider in sorted(provider_avg_scores.keys()):
                 scores = provider_avg_scores[provider]
 

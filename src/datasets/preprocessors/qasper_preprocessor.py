@@ -22,7 +22,7 @@ class QasperPreprocessor(BasePreprocessor):
     Preprocessor for Qasper dataset (Question Answering on Scholarly Publications).
 
     Approach:
-    1. Load metadata from HuggingFace datasets (paper IDs, questions, answers)
+    1. Load metadata from HuggingFace datasets (document IDs, questions, answers)
     2. Download original PDFs from arxiv (realistic RAG test with formatting artifacts)
     3. Extract raw text from PDFs (no cleaning - RAG should handle messy text)
     4. Create samples: question + raw_pdf_text + ground_truth_answer
@@ -112,7 +112,7 @@ class QasperPreprocessor(BasePreprocessor):
         self,
         file_path: str = None,
         split: str = "train",
-        max_papers: Optional[int] = None,
+        max_docs: Optional[int] = None,
         filter_unanswerable: bool = True,
         **kwargs
     ) -> ProcessedDataset:
@@ -122,11 +122,11 @@ class QasperPreprocessor(BasePreprocessor):
         Args:
             file_path: Ignored (kept for interface compatibility)
             split: Dataset split ('train', 'validation', or 'test')
-            max_papers: Maximum number of papers to process (None = all papers)
+            max_docs: Maximum number of documents to process (None = all documents)
             filter_unanswerable: Skip questions with no answer
 
         Returns:
-            ProcessedDataset with samples from successfully downloaded papers
+            ProcessedDataset with samples from successfully downloaded documents
         """
         logger.info(f"Loading Qasper dataset (split: {split})")
 
@@ -154,32 +154,32 @@ class QasperPreprocessor(BasePreprocessor):
 
         samples = []
         stats = {
-            'total_papers': 0,
-            'downloaded_papers': 0,
+            'total_docs': 0,
+            'downloaded_docs': 0,
             'failed_downloads': 0,
             'total_questions': 0,
             'skipped_unanswerable': 0,
             'samples_created': 0
         }
 
-        # Process papers
-        papers_to_process = min(len(dataset), max_papers) if max_papers else len(dataset)
-        logger.info(f"Processing {papers_to_process} papers from {len(dataset)} total")
+        # Process documents
+        docs_to_process = min(len(dataset), max_docs) if max_docs else len(dataset)
+        logger.info(f"Processing {docs_to_process} documents from {len(dataset)} total")
 
-        for i, paper in enumerate(dataset):
-            if max_papers and i >= max_papers:
+        for i, doc_data in enumerate(dataset):
+            if max_docs and i >= max_docs:
                 break
 
-            stats['total_papers'] += 1
-            arxiv_id = paper['id']
-            title = paper['title']
+            stats['total_docs'] += 1
+            arxiv_id = doc_data['id']
+            title = doc_data['title']
 
-            logger.info(f"[{i+1}/{papers_to_process}] Processing paper: {arxiv_id}")
+            logger.info(f"[{i+1}/{docs_to_process}] Processing document: {arxiv_id}")
 
             # Download PDF from arxiv
             pdf_path = self.downloader.download(arxiv_id)
             if pdf_path is None:
-                logger.warning(f"Failed to download paper {arxiv_id}, skipping")
+                logger.warning(f"Failed to download document {arxiv_id}, skipping")
                 stats['failed_downloads'] += 1
                 continue
 
@@ -190,10 +190,10 @@ class QasperPreprocessor(BasePreprocessor):
                 stats['failed_downloads'] += 1
                 continue
 
-            stats['downloaded_papers'] += 1
+            stats['downloaded_docs'] += 1
 
-            # Process questions for this paper
-            qas = paper['qas']
+            # Process questions for this document
+            qas = doc_data['qas']
             questions = qas['question']
             question_ids = qas['question_id']
             answers_list = qas['answers']
@@ -217,8 +217,8 @@ class QasperPreprocessor(BasePreprocessor):
                     ground_truth=answer,
                     metadata={
                         'question_id': q_id,
-                        'paper_id': arxiv_id,
-                        'paper_title': title,
+                        'doc_id': arxiv_id,
+                        'doc_title': title,
                         'is_unanswerable': not bool(answer),
                         'pdf_path': str(pdf_path)
                     }
@@ -235,7 +235,7 @@ class QasperPreprocessor(BasePreprocessor):
         }
 
         logger.info(
-            f"Qasper processing complete: {stats['downloaded_papers']}/{stats['total_papers']} papers, "
+            f"Qasper processing complete: {stats['downloaded_docs']}/{stats['total_docs']} documents, "
             f"{stats['samples_created']} samples created"
         )
 

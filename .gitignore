@@ -55,6 +55,8 @@ data/datasets/**/*.parquet
 data/datasets/**/*.pdf
 data/cache/
 data/results/
+*sanitized_policies/
+*original_policies/
 
 # But KEEP metadata and small test files
 !data/datasets/**/dataset.yaml

@@ -16,24 +16,24 @@
   - Runs multiple providers on same document
   - Handles timeouts and errors gracefully
   - Tracks costs and performance per provider
-- **paper_processor.py** - Document processing logic (CP5)
-  - Coordinates provider execution for one paper
+- **document_processor.py** - Document processing logic (CP5)
+  - Coordinates provider execution for one document
   - Manages question batching
-  - Saves per-paper results
+  - Saves per-document results
 - **result_saver.py** - Results management with resume (CP5)
   - Saves structured JSON results
   - Enables resume from interruptions
   - Creates timestamped run directories
   - Generates summary aggregations
 - **schemas.py** - Data structures (CP5)
-  - BenchmarkConfig, PaperResult, ProviderResult
+  - BenchmarkConfig, DocumentResult, ProviderResult
   - Standardized result format across providers
 - **ragas_evaluator.py** - Ragas metric evaluation
   - Faithfulness, Factual Correctness, Context Recall
   - Batch evaluation for efficiency
 - **scorer.py** - Batch LLM scoring (GPT structured outputs)
   - Legacy scorer for comparison
-- **rag_logger.py** - Structured logging for multi-paper experiments
+- **rag_logger.py** - Structured logging for multi-document experiments
 
 ### Adapters (`src/adapters/`)
 - **base.py** - BaseAdapter interface (ALL providers must implement)
@@ -122,31 +122,32 @@ RAGResponse(answer, context, metadata, latency_ms, tokens_used)
 
 ```
 1. CLI Entry Point (scripts/run_benchmark.py)
-   ├─ Parse arguments (--papers, --questions, --providers, etc.)
-   ├─ Load benchmark.yaml config
+   ├─ Parse arguments (--config, --docs, --questions, --providers, etc.)
+   ├─ Load config (benchmark_qasper.yaml or benchmark_policyqa.yaml)
    └─ Create Orchestrator instance
 
 2. Orchestrator.run_benchmark()
-   ├─ Load dataset (Qasper or SQuAD 2.0)
-   │  ├─ Download metadata from HuggingFace (cached)
-   │  └─ Download PDFs from arxiv on-demand (cached)
+   ├─ Load dataset (Qasper, PolicyQA, or SQuAD 2.0)
+   │  ├─ Qasper: Download metadata from HuggingFace, PDFs from arxiv (cached)
+   │  ├─ PolicyQA: Download JSON from GitHub, convert HTML→PDF via Playwright (cached)
+   │  └─ SQuAD 2.0: Download JSON from HuggingFace (cached)
    ├─ Create timestamped run directory
    ├─ Initialize adapters via AdapterFactory
    │  ├─ LlamaIndex (if configured)
    │  ├─ LandingAI (if configured)
    │  └─ Reducto (if configured)
-   └─ Process papers sequentially (or parallel if configured)
+   └─ Process documents sequentially (or parallel if configured)
 
-3. PaperProcessor.process_paper(paper, providers)
-   ├─ Check if paper already processed (resume capability)
-   ├─ Create paper directory in results/
+3. DocumentProcessor.process_document(document, providers)
+   ├─ Check if document already processed (resume capability)
+   ├─ Create document directory in results/
    ├─ Execute providers IN PARALLEL (ThreadPoolExecutor)
    │  ├─ Provider 1: ingest → query all questions → evaluate
    │  ├─ Provider 2: ingest → query all questions → evaluate
    │  └─ Provider 3: ingest → query all questions → evaluate
-   └─ Save per-paper results
+   └─ Save per-document results
 
-4. ProviderExecutor.execute(provider, paper, questions)
+4. ProviderExecutor.execute(provider, document, questions)
    ├─ Prepare document with PDF path metadata
    ├─ Ingest document → get index_id (with timeout)
    ├─ Query all questions → collect RAGResponse objects
@@ -159,24 +160,24 @@ RAGResponse(answer, context, metadata, latency_ms, tokens_used)
 
 5. ResultSaver.save_results()
    ├─ Save per-provider JSON files
-   │  ├─ papers/1909.00694/llamaindex_results.json
-   │  ├─ papers/1909.00694/landingai_results.json
-   │  └─ papers/1909.00694/reducto_results.json
+   │  ├─ docs/1909.00694/llamaindex_results.json
+   │  ├─ docs/1909.00694/landingai_results.json
+   │  └─ docs/1909.00694/reducto_results.json
    ├─ Generate summary.json (aggregated metrics)
    └─ Save benchmark_config.yaml snapshot
 ```
 
 ### Parallel Execution Model
 
-**Per Paper**:
+**Per Document**:
 - All 3 providers run in parallel (ThreadPoolExecutor with max_provider_workers=3)
 - Each provider independently: ingests → queries → evaluates
 - Results saved as soon as each provider completes
 
 **Resume Capability**:
-- Check if paper directory exists in results/run_ID/papers/
-- Skip already-processed papers on resume
-- Continue from next unprocessed paper
+- Check if document directory exists in results/run_ID/docs/
+- Skip already-processed documents on resume
+- Continue from next unprocessed document
 
 **Error Handling**:
 - Provider failures don't stop other providers

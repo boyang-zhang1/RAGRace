@@ -1,5 +1,6 @@
 # Dataset Configuration
 # Define datasets for RAG evaluation
+# Note: For datasets with splits (train/dev/test), specify split at runtime via DatasetLoader.load_xxx(split='...')
 
 datasets:
   # SQuAD 2.0 - Stanford Question Answering Dataset
@@ -9,6 +10,24 @@ datasets:
     preprocessor: squad
     description: Stanford Question Answering Dataset v2.0
     size: ~12k questions
+
+  # Qasper - Question Answering on Scholarly Documents
+  - name: qasper
+    source: null  # Downloaded from HuggingFace
+    format: parquet
+    preprocessor: qasper
+    description: NLP research documents with questions (1,585 documents, 5,049 questions)
+    size: ~888 docs (train), ~281 docs (validation), ~416 docs (test)
+    splits: [train, validation, test]
+
+  # PolicyQA - Privacy Policy QA Dataset
+  - name: policyqa
+    source: null  # Downloaded from GitHub
+    format: json
+    preprocessor: policyqa
+    description: Privacy policy QA (115 websites, 25,017 questions)
+    size: ~20k questions (train), ~2.5k questions (dev), ~2.5k questions (test)
+    splits: [train, dev, test]
 
   # Add more datasets here
   # - name: custom_dataset

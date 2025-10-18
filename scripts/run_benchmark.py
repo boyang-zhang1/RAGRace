@@ -12,7 +12,7 @@ Usage:
     python scripts/run_benchmark.py --config config/my_benchmark.yaml
 
     # Override dataset parameters
-    python scripts/run_benchmark.py --papers 5 --questions 10
+    python scripts/run_benchmark.py --docs 5 --questions 10
 
     # Run specific providers only
     python scripts/run_benchmark.py --providers llamaindex reducto
@@ -21,14 +21,14 @@ Usage:
     python scripts/run_benchmark.py --resume run_20251018_103045
 
 Examples:
-    # Quick test: 1 paper, 1 question
-    python scripts/run_benchmark.py --papers 1 --questions 1
+    # Quick test: 1 doc, 1 question
+    python scripts/run_benchmark.py --docs 1 --questions 1
 
-    # Small benchmark: 2 papers, 3 questions
-    python scripts/run_benchmark.py --papers 2 --questions 3
+    # Small benchmark: 2 docs, 3 questions
+    python scripts/run_benchmark.py --docs 2 --questions 3
 
-    # Full benchmark: all papers, all questions
-    python scripts/run_benchmark.py --papers null --questions null
+    # Full benchmark: all docs, all questions
+    python scripts/run_benchmark.py --docs null --questions null
 """
 
 import sys
@@ -60,8 +60,8 @@ def parse_args():
     parser.add_argument(
         '--config',
         type=str,
-        default='config/benchmark.yaml',
-        help='Path to benchmark configuration file (default: config/benchmark.yaml)'
+        default='config/benchmark_qasper.yaml',
+        help='Path to benchmark configuration file (default: config/benchmark_qasper.yaml)'
     )
 
     # Dataset overrides
@@ -72,15 +72,15 @@ def parse_args():
     )
 
     parser.add_argument(
-        '--papers',
+        '--docs',
         type=str,
-        help='Max papers to process (number or "null" for all, overrides config)'
+        help='Max docs to process (number or "null" for all, overrides config)'
     )
 
     parser.add_argument(
         '--questions',
         type=str,
-        help='Max questions per paper (number or "null" for all, overrides config)'
+        help='Max questions per doc (number or "null" for all, overrides config)'
     )
 
     # Provider selection
@@ -115,7 +115,7 @@ def parse_args():
     parser.add_argument(
         '--no-resume',
         action='store_true',
-        help='Disable resume capability (reprocess all papers)'
+        help='Disable resume capability (reprocess all documents)'
     )
 
     # Verbose output
@@ -145,17 +145,17 @@ def override_config(config: dict, args: argparse.Namespace) -> dict:
     if args.dataset:
         benchmark_config['dataset']['name'] = args.dataset
 
-    if args.papers:
-        if args.papers.lower() == 'null':
-            benchmark_config['dataset']['max_papers'] = None
+    if args.docs:
+        if args.docs.lower() == 'null':
+            benchmark_config['dataset']['max_docs'] = None
         else:
-            benchmark_config['dataset']['max_papers'] = int(args.papers)
+            benchmark_config['dataset']['max_docs'] = int(args.docs)
 
     if args.questions:
         if args.questions.lower() == 'null':
-            benchmark_config['dataset']['max_questions_per_paper'] = None
+            benchmark_config['dataset']['max_questions_per_doc'] = None
         else:
-            benchmark_config['dataset']['max_questions_per_paper'] = int(args.questions)
+            benchmark_config['dataset']['max_questions_per_doc'] = int(args.questions)
 
     # Provider overrides
     if args.providers:
@@ -205,13 +205,13 @@ def main():
         config = yaml.safe_load(f)
 
     # Apply command-line overrides
-    if any([args.dataset, args.papers, args.questions, args.providers,
+    if any([args.dataset, args.docs, args.questions, args.providers,
             args.workers, args.output_dir, args.no_resume]):
         print("\nApplying command-line overrides:")
         if args.dataset:
             print(f"  Dataset: {args.dataset}")
-        if args.papers:
-            print(f"  Max papers: {args.papers}")
+        if args.docs:
+            print(f"  Max docs: {args.docs}")
         if args.questions:
             print(f"  Max questions: {args.questions}")
         if args.providers:
@@ -240,7 +240,7 @@ def main():
             print(f"\n📂 Resuming from run: {args.resume}")
             orchestrator.result_saver.run_id = args.resume
             orchestrator.result_saver.run_dir = Path(config['benchmark']['output']['results_dir']) / args.resume
-            orchestrator.result_saver.papers_dir = orchestrator.result_saver.run_dir / "papers"
+            orchestrator.result_saver.docs_dir = orchestrator.result_saver.run_dir / "docs"
 
         summary = orchestrator.run_benchmark()
 

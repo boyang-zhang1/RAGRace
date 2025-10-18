@@ -1,7 +1,7 @@
 """
 Arxiv PDF downloader with caching and rate limiting.
 
-Downloads research papers from arxiv.org for RAG evaluation datasets.
+Downloads research documents from arxiv.org for RAG evaluation datasets.
 """
 
 import time
@@ -52,7 +52,7 @@ class ArxivDownloader:
         Download PDF for given arxiv ID.
 
         Args:
-            arxiv_id: Arxiv paper ID (e.g., "1909.00694")
+            arxiv_id: Arxiv document ID (e.g., "1909.00694")
 
         Returns:
             Path to downloaded PDF, or None if download failed
@@ -67,19 +67,19 @@ class ArxivDownloader:
         self._rate_limit()
 
         try:
-            # Search for paper
-            logger.info(f"Downloading arxiv paper: {arxiv_id}")
+            # Search for document
+            logger.info(f"Downloading arxiv document: {arxiv_id}")
             search = arxiv.Search(id_list=[arxiv_id])
-            paper = next(search.results())
+            result = next(search.results())
 
             # Download PDF
-            paper.download_pdf(dirpath=str(self.cache_dir), filename=f"{arxiv_id}.pdf")
+            result.download_pdf(dirpath=str(self.cache_dir), filename=f"{arxiv_id}.pdf")
 
             logger.info(f"Successfully downloaded: {arxiv_id}")
             return pdf_path
 
         except StopIteration:
-            logger.warning(f"Paper not found on arxiv: {arxiv_id}")
+            logger.warning(f"Document not found on arxiv: {arxiv_id}")
             return None
         except Exception as e:
             logger.warning(f"Failed to download {arxiv_id}: {e}")
@@ -90,7 +90,7 @@ class ArxivDownloader:
         Download multiple PDFs.
 
         Args:
-            arxiv_ids: List of arxiv paper IDs
+            arxiv_ids: List of arxiv document IDs
 
         Returns:
             Dict mapping arxiv_id -> pdf_path (or None if failed)

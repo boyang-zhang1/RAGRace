@@ -6,37 +6,37 @@ name: Qasper
 version: "1.0"
 type: qasper
 source_url: https://huggingface.co/datasets/allenai/qasper
-paper_url: https://arxiv.org/abs/2105.03011
+reference_url: https://arxiv.org/abs/2105.03011
 
 description: >
   QASPER (Question Answering on Scholarly Publications Enhanced by Retrieval).
-  1,585 NLP research papers with 5,049 information-seeking questions.
+  1,585 NLP research documents with 5,049 information-seeking questions.
   Questions asked by regular readers, answered by NLP practitioners.
-  Tests RAG systems on long-form scientific documents (full papers).
+  Tests RAG systems on long-form scientific documents.
 
 splits:
   train:
-    papers: 888
+    documents: 888
     questions: ~2850
     source: HuggingFace datasets
 
   validation:
-    papers: 281
+    documents: 281
     questions: ~900
     source: HuggingFace datasets
 
   test:
-    papers: 416
+    documents: 416
     questions: ~1300
     source: HuggingFace datasets
 
 structure:
   format: PDF (downloaded from arxiv) + HuggingFace metadata
-  paper_source: arxiv.org (PDFs)
+  document_source: arxiv.org (PDFs)
   questions_source: HuggingFace datasets library
   schema:
-    paper_id: string (arxiv ID, e.g., "1909.00694")
-    title: string (paper title)
+    doc_id: string (arxiv ID, e.g., "1909.00694")
+    title: string (document title)
     pdf_text: string (raw extracted text - no preprocessing)
     qas:
       - question: string
@@ -44,20 +44,20 @@ structure:
         answers: list (multiple annotators, multiple answer types)
 
 answer_types:
-  - extractive: Spans from paper text
+  - extractive: Spans from document text
   - abstractive: Free-form text answers
   - boolean: Yes/No answers
-  - unanswerable: Questions with no answer in paper
+  - unanswerable: Questions with no answer in document
 
 features:
-  - Full-text research papers (long context, 10k+ tokens)
+  - Full-text research documents (long context, 10k+ tokens)
   - Expert annotations (both Q and A)
   - Multiple answer types
   - Evidence grounding
-  - Domain-specific (NLP papers)
+  - Domain-specific (NLP documents)
   - Realistic information-seeking questions
 
-sample_papers:
+sample_documents:
   - id: "1909.00694"
     title: "Minimally Supervised Learning of Affective Events Using Discourse Relations"
   - id: "1909.01380"
@@ -70,11 +70,11 @@ usage:
   preprocessor: QasperPreprocessor
   options:
     - split: 'train' | 'validation' | 'test'
-    - max_papers: int (default None = all papers, set limit for testing)
+    - max_docs: int (default None = all documents, set limit for testing)
     - filter_unanswerable: bool (default True)
   examples:
-    - Load all papers: DatasetLoader.load_qasper(split='train')
-    - Load 10 papers: DatasetLoader.load_qasper(split='train', max_papers=10)
+    - Load all documents: DatasetLoader.load_qasper(split='train')
+    - Load 10 documents: DatasetLoader.load_qasper(split='train', max_docs=10)
 
 data_storage:
   pdfs: data/datasets/Qasper/pdfs/*.pdf (NOT committed, cached locally)
@@ -86,7 +86,7 @@ notes:
   - PDFs downloaded on first load (cached for reuse)
   - Rate limiting: 3s between downloads (respect arxiv)
   - Raw PDF text used (no preprocessing - realistic RAG eval)
-  - Papers that fail to download are skipped
+  - Documents that fail to download are skipped
   - Requires: arxiv>=2.0.0, pypdf>=3.0.0, datasets>=4.0.0
   - License: CC-BY-4.0
 
@@ -99,7 +99,7 @@ evaluation_metrics:
   - Retrieval precision@K
 
 why_qasper:
-  - Tests long-form document RAG (full papers vs paragraphs)
+  - Tests long-form document RAG (full documents vs paragraphs)
   - Real PDF text (headers, footers, formatting issues)
   - Domain-specific technical content
   - Multi-hop reasoning requirements

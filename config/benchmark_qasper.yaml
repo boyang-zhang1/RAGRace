@@ -4,10 +4,10 @@
 benchmark:
   # Dataset configuration
   dataset:
-    name: qasper                      # Dataset type (currently only qasper supported)
+    name: qasper                      # Dataset type (qasper, policyqa, etc.)
     split: train                       # train | validation | test
-    max_papers: 2                      # Limit for testing (null = all papers)
-    max_questions_per_paper: 3         # Questions per paper (null = all questions)
+    max_docs: 2                        # Limit for testing (null = all docs)
+    max_questions_per_doc: 3           # Questions per doc (null = all questions)
     filter_unanswerable: true          # Skip unanswerable questions
 
   # Provider selection
@@ -19,8 +19,8 @@ benchmark:
 
   # Execution parameters
   execution:
-    max_provider_workers: 3   # Concurrent providers per paper (3 = max parallelism)
-    max_paper_workers: 1      # Papers processed concurrently (1 = sequential)
+    max_provider_workers: 3   # Concurrent providers per document (3 = max parallelism)
+    max_doc_workers: 1        # Documents processed concurrently (1 = sequential)
 
   # Timeout configuration (seconds)
   # Increase these if working with very large documents
@@ -41,7 +41,7 @@ benchmark:
   output:
     results_dir: data/results         # Base directory for all results
     save_intermediate: true           # Save after each provider completes
-    resume_enabled: true              # Skip already-completed papers
+    resume_enabled: true              # Skip already-completed documents
 
   # Ragas evaluation configuration
   evaluation:

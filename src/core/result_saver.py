@@ -5,11 +5,11 @@ File structure:
 data/results/
 └── run_{timestamp}/
     ├── config.json
-    ├── papers/
-    │   ├── {paper_id}/
+    ├── docs/
+    │   ├── {doc_id}/
     │   │   ├── {provider}.json
     │   │   ├── aggregated.json
-    │   │   └── paper.log
+    │   │   └── doc.log
     ├── summary.json
     └── run.log
 """
@@ -19,7 +19,7 @@ from pathlib import Path
 from datetime import datetime
 from typing import Dict, Any
 
-from src.core.schemas import ProviderResult, PaperResult, RunSummary
+from src.core.schemas import ProviderResult, DocumentResult, RunSummary
 
 
 class ResultSaver:
@@ -41,11 +41,11 @@ class ResultSaver:
 
         self.run_id = run_id
         self.run_dir = self.output_dir / run_id
-        self.papers_dir = self.run_dir / "papers"
+        self.docs_dir = self.run_dir / "docs"
 
         # Create directories
         self.run_dir.mkdir(parents=True, exist_ok=True)
-        self.papers_dir.mkdir(exist_ok=True)
+        self.docs_dir.mkdir(exist_ok=True)
 
         print(f"📁 Results directory: {self.run_dir}")
 
@@ -59,42 +59,42 @@ class ResultSaver:
         """
         Save individual provider result.
 
-        File: papers/{paper_id}/{provider}.json
+        File: docs/{doc_id}/{provider}.json
         """
-        paper_dir = self.papers_dir / result.paper_id
-        paper_dir.mkdir(exist_ok=True)
+        doc_dir = self.docs_dir / result.doc_id
+        doc_dir.mkdir(exist_ok=True)
 
-        result_path = paper_dir / f"{result.provider}.json"
+        result_path = doc_dir / f"{result.provider}.json"
         with open(result_path, 'w') as f:
             json.dump(result.to_dict(), f, indent=2)
 
         print(f"   💾 Saved: {result_path.relative_to(self.output_dir)}")
 
-    def save_paper_aggregated(self, paper_result: PaperResult):
+    def save_document_aggregated(self, doc_result: DocumentResult):
         """
-        Save aggregated paper result.
+        Save aggregated document result.
 
-        File: papers/{paper_id}/aggregated.json
+        File: docs/{doc_id}/aggregated.json
         """
-        paper_dir = self.papers_dir / paper_result.paper_id
-        paper_dir.mkdir(exist_ok=True)
+        doc_dir = self.docs_dir / doc_result.doc_id
+        doc_dir.mkdir(exist_ok=True)
 
-        result_path = paper_dir / "aggregated.json"
+        result_path = doc_dir / "aggregated.json"
         with open(result_path, 'w') as f:
-            json.dump(paper_result.to_dict(), f, indent=2)
+            json.dump(doc_result.to_dict(), f, indent=2)
 
         print(f"   💾 Saved: {result_path.relative_to(self.output_dir)}")
 
-    def save_paper_log(self, paper_id: str, log_content: str):
+    def save_document_log(self, doc_id: str, log_content: str):
         """
-        Save paper log file.
+        Save document log file.
 
-        File: papers/{paper_id}/paper.log
+        File: docs/{doc_id}/doc.log
         """
-        paper_dir = self.papers_dir / paper_id
-        paper_dir.mkdir(exist_ok=True)
+        doc_dir = self.docs_dir / doc_id
+        doc_dir.mkdir(exist_ok=True)
 
-        log_path = paper_dir / "paper.log"
+        log_path = doc_dir / "doc.log"
         with open(log_path, 'w', encoding='utf-8') as f:
             f.write(log_content)
 
@@ -112,24 +112,24 @@ class ResultSaver:
 
         print(f"\n📊 Run summary saved: {summary_path}")
 
-    def load_paper_result(self, paper_id: str) -> Dict:
+    def load_doc_result(self, doc_id: str) -> Dict:
         """
-        Load aggregated paper result (for resume capability).
+        Load aggregated document result (for resume capability).
 
         Returns:
-            PaperResult dict if exists, else raises FileNotFoundError
+            DocumentResult dict if exists, else raises FileNotFoundError
         """
-        aggregated_path = self.papers_dir / paper_id / "aggregated.json"
+        aggregated_path = self.docs_dir / doc_id / "aggregated.json"
 
         if not aggregated_path.exists():
-            raise FileNotFoundError(f"No saved result for paper: {paper_id}")
+            raise FileNotFoundError(f"No saved result for document: {doc_id}")
 
         with open(aggregated_path) as f:
             data = json.load(f)
 
         return data
 
-    def paper_completed(self, paper_id: str) -> bool:
-        """Check if paper has already been processed."""
-        aggregated_path = self.papers_dir / paper_id / "aggregated.json"
+    def doc_completed(self, doc_id: str) -> bool:
+        """Check if document has already been processed."""
+        aggregated_path = self.docs_dir / doc_id / "aggregated.json"
         return aggregated_path.exists()

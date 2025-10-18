@@ -9,8 +9,8 @@ This test validates the complete CP5 implementation:
 - Resume capability
 
 Test configuration:
-- 1 paper from Qasper dataset
-- 1 question per paper
+- 1 document from Qasper dataset
+- 1 question per document
 - 3 providers (LlamaIndex, LandingAI, Reducto)
 - Real API calls (requires valid API keys)
 """
@@ -36,14 +36,14 @@ class TestOrchestratorParallel:
                 'dataset': {
                     'name': 'qasper',
                     'split': 'train',
-                    'max_papers': 2,  # 2 papers for better testing
-                    'max_questions_per_paper': 3,  # 3 questions per paper
+                    'max_docs': 2,  # 2 documents for better testing
+                    'max_questions_per_doc': 3,  # 3 questions per document
                     'filter_unanswerable': True
                 },
                 'providers': ['llamaindex', 'landingai', 'reducto'],
                 'execution': {
                     'max_provider_workers': 3,  # All 3 in parallel
-                    'max_paper_workers': 1
+                    'max_doc_workers': 1
                 },
                 'timeouts': {
                     'provider_init': 30,
@@ -87,7 +87,7 @@ class TestOrchestratorParallel:
         }
 
         # Write config to file
-        config_path = tmp_path / 'benchmark.yaml'
+        config_path = tmp_path / 'benchmark_qasper.yaml'
         import yaml
         with open(config_path, 'w') as f:
             yaml.dump(config, f)
@@ -133,8 +133,8 @@ class TestOrchestratorParallel:
 
         # Get individual provider times
         provider_times = []
-        for paper_result in summary.results:
-            for provider_name, provider_result in paper_result.providers.items():
+        for doc_result in summary.results:
+            for provider_name, provider_result in doc_result.providers.items():
                 if provider_result.status == "success":
                     provider_times.append(provider_result.duration_seconds)
                     print(f"  {provider_name}: {provider_result.duration_seconds:.1f}s")
@@ -173,20 +173,20 @@ class TestOrchestratorParallel:
         summary = orchestrator.run_benchmark()
 
         # Verify summary
-        assert summary.num_papers == 2
+        assert summary.num_docs == 2
         assert summary.num_questions_total >= 3  # At least a few questions (dataset dependent)
         assert len(summary.providers) == 3
         assert len(summary.results) == 2
 
-        # Verify each paper
-        for paper_idx, paper_result in enumerate(summary.results, 1):
-            print(f"\n--- Paper {paper_idx}: {paper_result.paper_id} ---")
+        # Verify each document
+        for doc_idx, doc_result in enumerate(summary.results, 1):
+            print(f"\n--- Document {doc_idx}: {doc_result.doc_id} ---")
 
             # Verify all providers completed
-            assert len(paper_result.providers) == 3
+            assert len(doc_result.providers) == 3
             for provider_name in ['llamaindex', 'landingai', 'reducto']:
-                assert provider_name in paper_result.providers
-                provider_result = paper_result.providers[provider_name]
+                assert provider_name in doc_result.providers
+                provider_result = doc_result.providers[provider_name]
                 print(f"\n{provider_name}:")
                 print(f"  Status: {provider_result.status}")
                 if provider_result.status == "success":
@@ -197,8 +197,8 @@ class TestOrchestratorParallel:
                     print(f"  Error: {provider_result.error}")
 
             # Verify winner determined
-            assert len(paper_result.winner) > 0
-            print(f"\nWinners: {paper_result.winner}")
+            assert len(doc_result.winner) > 0
+            print(f"\nWinners: {doc_result.winner}")
 
         # Verify file structure
         results_dir = Path(orchestrator.result_saver.run_dir)
@@ -211,14 +211,14 @@ class TestOrchestratorParallel:
             config_data = json.load(f)
             assert 'benchmark' in config_data
 
-        # Check paper directories (both papers)
-        for paper_result in summary.results:
-            paper_dir = results_dir / "papers" / paper_result.paper_id
-            assert paper_dir.exists()
+        # Check document directories (both documents)
+        for doc_result in summary.results:
+            doc_dir = results_dir / "docs" / doc_result.doc_id
+            assert doc_dir.exists()
 
             # Check provider JSONs
             for provider_name in ['llamaindex', 'landingai', 'reducto']:
-                provider_file = paper_dir / f"{provider_name}.json"
+                provider_file = doc_dir / f"{provider_name}.json"
                 assert provider_file.exists()
                 with open(provider_file) as f:
                     provider_data = json.load(f)
@@ -226,11 +226,11 @@ class TestOrchestratorParallel:
                     assert provider_data['status'] in ['success', 'error']
 
             # Check aggregated.json
-            aggregated_file = paper_dir / "aggregated.json"
+            aggregated_file = doc_dir / "aggregated.json"
             assert aggregated_file.exists()
             with open(aggregated_file) as f:
                 aggregated_data = json.load(f)
-                assert aggregated_data['paper_id'] == paper_result.paper_id
+                assert aggregated_data['doc_id'] == doc_result.doc_id
                 assert len(aggregated_data['providers']) == 3
 
         # Check summary.json
@@ -238,7 +238,7 @@ class TestOrchestratorParallel:
         assert summary_file.exists()
         with open(summary_file) as f:
             summary_data = json.load(f)
-            assert summary_data['num_papers'] == 2
+            assert summary_data['num_docs'] == 2
             assert summary_data['num_questions_total'] >= 3  # Dataset dependent
             assert len(summary_data['providers']) == 3
 
@@ -246,11 +246,11 @@ class TestOrchestratorParallel:
 
     def test_resume_capability(self, config_file, check_api_keys):
         """
-        Test resume capability - running twice should skip completed papers.
+        Test resume capability - running twice should skip completed documents.
 
         Validates:
         - First run completes normally
-        - Second run detects completed paper and skips
+        - Second run detects completed document and skips
         - Second run is much faster
         """
         print("\n" + "="*80)
@@ -265,7 +265,7 @@ class TestOrchestratorParallel:
         duration1 = time.time() - start_time1
 
         print(f"First run duration: {duration1:.1f}s")
-        assert summary1.num_papers == 2
+        assert summary1.num_docs == 2
 
         # Second run (should skip)
         print("\n--- Second run (should skip) ---")
@@ -273,7 +273,7 @@ class TestOrchestratorParallel:
         # Use same run_id to simulate resume
         orchestrator2.result_saver.run_id = orchestrator1.result_saver.run_id
         orchestrator2.result_saver.run_dir = orchestrator1.result_saver.run_dir
-        orchestrator2.result_saver.papers_dir = orchestrator1.result_saver.papers_dir
+        orchestrator2.result_saver.docs_dir = orchestrator1.result_saver.docs_dir
 
         start_time2 = time.time()
         summary2 = orchestrator2.run_benchmark()
