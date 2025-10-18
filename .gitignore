@@ -8,6 +8,9 @@
 config/providers.generated.yaml
 CLAUDE.md
 
+# Temporary runtime files
+.ragrace_temp_config.yaml
+
 # Session state and local documentation (not committed)
 local_docs/
 
