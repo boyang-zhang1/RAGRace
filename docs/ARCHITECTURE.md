@@ -3,26 +3,27 @@
 ## Components
 
 ### Core Pipeline (`src/core/`)
-- **orchestrator.py** - Main benchmark coordinator (CP5)
+- **orchestrator.py** - Main benchmark coordinator
   - Loads configuration and datasets
-  - Coordinates multi-provider parallel execution
-  - Manages resume capability and partial results
+  - Creates (provider, document) task combinations
+  - Manages semaphore-based rate limiting (per-provider + RAGAS)
+  - Executes tasks in parallel with ThreadPoolExecutor
   - Aggregates and saves final results
-- **adapter_factory.py** - Dynamic provider instantiation (CP5)
+- **adapter_factory.py** - Dynamic provider instantiation
   - Creates adapter instances from config
   - Handles provider-specific initialization
   - Manages API key injection from environment
-- **provider_executor.py** - Parallel provider execution (CP5)
-  - Runs multiple providers on same document
+- **provider_executor.py** - Individual task execution with rate limiting
+  - Executes one (provider, document) combination
+  - Acquires/releases semaphores for rate limiting
   - Handles timeouts and errors gracefully
-  - Tracks costs and performance per provider
-- **document_processor.py** - Document processing logic (CP5)
-  - Coordinates provider execution for one document
-  - Manages question batching
-  - Saves per-document results
-- **result_saver.py** - Results management with resume (CP5)
-  - Saves structured JSON results
-  - Enables resume from interruptions
+  - Tracks costs and performance per task
+- **document_processor.py** - DEPRECATED (kept for backward compatibility)
+  - Legacy: Coordinated provider execution per document
+  - New code uses Orchestrator.run_benchmark() directly
+- **result_saver.py** - Thread-safe results management
+  - Saves structured JSON results with file locks
+  - Enables resume from interruptions (task-level)
   - Creates timestamped run directories
   - Generates summary aggregations
 - **schemas.py** - Data structures (CP5)
@@ -116,7 +117,7 @@ RAGResponse(answer, context, metadata, latency_ms, tokens_used)
 2. **AI** (`config/providers.generated.yaml`): detailed API specs from research
 3. **Secrets** (`.env`): API keys (OPENAI_API_KEY, LLAMAINDEX_API_KEY, VISION_AGENT_API_KEY, REDUCTO_API_KEY)
 
-## Execution Flow (CP5 Complete)
+## Execution Flow (Parallel Task Model)
 
 ### End-to-End Benchmark Pipeline
 
@@ -136,53 +137,73 @@ RAGResponse(answer, context, metadata, latency_ms, tokens_used)
    │  ├─ LlamaIndex (if configured)
    │  ├─ LandingAI (if configured)
    │  └─ Reducto (if configured)
-   └─ Process documents sequentially (or parallel if configured)
+   ├─ Create semaphores for rate limiting
+   │  ├─ Per-provider semaphores (max_per_provider_workers=3)
+   │  └─ RAGAS evaluation semaphore (max_ragas_workers=5)
+   └─ Generate and execute (provider, document) task combinations
 
-3. DocumentProcessor.process_document(document, providers)
-   ├─ Check if document already processed (resume capability)
-   ├─ Create document directory in results/
-   ├─ Execute providers IN PARALLEL (ThreadPoolExecutor)
-   │  ├─ Provider 1: ingest → query all questions → evaluate
-   │  ├─ Provider 2: ingest → query all questions → evaluate
-   │  └─ Provider 3: ingest → query all questions → evaluate
-   └─ Save per-document results
+3. Parallel Task Execution (ThreadPoolExecutor)
+   ├─ Create all (provider, doc) combinations as independent tasks
+   ├─ Execute tasks in parallel (max_total_workers=9)
+   │  ├─ Task 1: Provider A + Doc 1
+   │  ├─ Task 2: Provider B + Doc 1
+   │  ├─ Task 3: Provider C + Doc 1
+   │  ├─ Task 4: Provider A + Doc 2
+   │  └─ ... (all combinations execute concurrently)
+   └─ Results collected as tasks complete (async)
 
-4. ProviderExecutor.execute(provider, document, questions)
+4. ProviderExecutor.execute(provider, document, questions) WITH RATE LIMITING
+   ├─ Acquire provider semaphore (wait if provider at capacity)
    ├─ Prepare document with PDF path metadata
    ├─ Ingest document → get index_id (with timeout)
    ├─ Query all questions → collect RAGResponse objects
+   ├─ Acquire RAGAS semaphore (wait if evaluation queue full)
    ├─ Evaluate with Ragas → get metrics
    │  ├─ Faithfulness (answer grounded in context?)
    │  ├─ Factual Correctness (answer matches ground truth?)
    │  └─ Context Recall (relevant context retrieved?)
+   ├─ Release RAGAS semaphore
+   ├─ Release provider semaphore
    ├─ Track costs (tokens, API calls)
    └─ Return ProviderResult
 
-5. ResultSaver.save_results()
-   ├─ Save per-provider JSON files
-   │  ├─ docs/1909.00694/llamaindex_results.json
-   │  ├─ docs/1909.00694/landingai_results.json
-   │  └─ docs/1909.00694/reducto_results.json
+5. ResultSaver.save_results() (thread-safe with locks)
+   ├─ Save per-provider JSON files (as tasks complete)
+   │  ├─ docs/1909.00694/llamaindex.json
+   │  ├─ docs/1909.00694/landingai.json
+   │  └─ docs/1909.00694/reducto.json
+   ├─ Aggregate results per document (after all providers complete)
    ├─ Generate summary.json (aggregated metrics)
    └─ Save benchmark_config.yaml snapshot
 ```
 
 ### Parallel Execution Model
 
-**Per Document**:
-- All 3 providers run in parallel (ThreadPoolExecutor with max_provider_workers=3)
-- Each provider independently: ingests → queries → evaluates
-- Results saved as soon as each provider completes
+**Task-Based Parallelism**:
+- Each (provider, document) is an independent task
+- Example: 3 docs × 3 providers = 9 parallel tasks
+- Tasks execute concurrently up to `max_total_workers` limit
+- Results saved incrementally as tasks complete
+
+**Rate Limiting with Semaphores**:
+- **Per-provider semaphore**: Limits concurrent API calls per provider (prevents overwhelming provider APIs)
+- **RAGAS semaphore**: Limits concurrent OpenAI evaluation calls (prevents rate limit errors)
+- Tasks wait for semaphore slots before executing critical sections
 
 **Resume Capability**:
-- Check if document directory exists in results/run_ID/docs/
-- Skip already-processed documents on resume
-- Continue from next unprocessed document
+- Check if (provider, document) result file exists
+- Skip already-completed tasks on resume
+- Continue with remaining task combinations
 
 **Error Handling**:
-- Provider failures don't stop other providers
+- Individual task failures don't stop other tasks
 - Timeouts configurable per operation (ingest, query, evaluation)
-- Partial results saved on interruption (Ctrl+C)
+- Thread-safe result saving with file locks
+- Partial results preserved on interruption (Ctrl+C)
+
+**Legacy Support**:
+- DocumentProcessor class kept for backward compatibility
+- New code uses Orchestrator.run_benchmark() directly
 
 ## Tech Stack
 

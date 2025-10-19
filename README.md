@@ -57,9 +57,9 @@ python scripts/run_benchmark.py --docs 1 --questions 1 --providers llamaindex
 **What happens when you run this?**
 1. Downloads Qasper dataset from HuggingFace (first run only)
 2. Downloads research document PDFs from arxiv (cached locally)
-3. Runs 3 RAG providers in parallel on the same documents
+3. Executes all (provider, document) combinations in parallel with rate limiting
 4. Evaluates with Ragas metrics (faithfulness, factual correctness, context recall)
-5. Saves structured results to `data/results/run_YYYYMMDD_HHMMSS/`
+5. Saves results incrementally to `data/results/run_YYYYMMDD_HHMMSS/`
 
 ### 4. View Results
 
@@ -164,18 +164,25 @@ benchmark:
     name: qasper                       # qasper | policyqa | squad2
     split: train                       # train | validation | test (Qasper)
                                        # train | dev | test (PolicyQA)
-    max_docs: 2                        # Limit documents (null = all)
-    max_questions_per_doc: 3           # Questions per document (null = all)
+    max_docs: 10                       # Limit documents (null = all)
+    max_questions_per_doc: 5           # Questions per document (null = all)
 
   providers:                           # Add/remove providers
     - llamaindex
-    - landingai
     - reducto
 
   execution:
-    max_provider_workers: 3            # Parallel providers per document
-    max_doc_workers: 1                 # Parallel documents (sequential by default)
+    # NEW: Parallel task execution (provider × document combinations)
+    max_total_workers: 9               # Total parallel tasks (e.g., 3 docs × 3 providers)
+    max_per_provider_workers: 3        # Max concurrent tasks per provider (rate limiting)
+    max_ragas_workers: 5               # Max concurrent RAGAS evaluations (OpenAI protection)
 ```
+
+**Parallelization Model**:
+- Tasks are (provider, document) combinations executed in parallel
+- `max_total_workers`: Controls overall system concurrency
+- `max_per_provider_workers`: Prevents overwhelming individual provider APIs
+- `max_ragas_workers`: Protects OpenAI evaluation API from rate limits
 
 ### CLI Options
 
@@ -280,6 +287,7 @@ RAGRace/
 
 - **3 RAG Providers**: LlamaIndex, LandingAI, Reducto
 - **3 Datasets**: Qasper (research papers), PolicyQA (privacy policies), SQuAD 2.0 (Wikipedia)
+- **Parallel Execution**: Semaphore-based rate limiting for (provider, document) tasks
 - **HTML→PDF Pipeline**: Playwright-based conversion preserving document structure
 - **54+ Tests**: Unit and integration tests with real API validation
 - **Web Research**: Uses Playwright MCP to read actual API documentation (NO IMAGINATION)

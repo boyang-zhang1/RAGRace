@@ -6,6 +6,7 @@ Uses standard Ragas metrics: Faithfulness, FactualCorrectness, LLMContextRecall.
 """
 
 import os
+import time
 from typing import List, Dict, Any
 from dataclasses import dataclass
 
@@ -126,13 +127,39 @@ class RagasEvaluator:
         # Create Ragas EvaluationDataset
         evaluation_dataset = EvaluationDataset.from_list(dataset_list)
 
-        # Run evaluation (disable progress bar to avoid clutter in parallel execution)
-        result = evaluate(
-            dataset=evaluation_dataset,
-            metrics=self.metrics,
-            llm=self.evaluator_llm,
-            show_progress=False
-        )
+        # Run evaluation with retry logic for rate limits
+        max_retries = 5
+        base_delay = 2.0
+        result = None
+
+        for attempt in range(max_retries):
+            try:
+                # Run evaluation (disable progress bar to avoid clutter in parallel execution)
+                result = evaluate(
+                    dataset=evaluation_dataset,
+                    metrics=self.metrics,
+                    llm=self.evaluator_llm,
+                    show_progress=False
+                )
+                break  # Success - exit retry loop
+
+            except Exception as e:
+                error_msg = str(e)
+                is_rate_limit = "rate_limit" in error_msg.lower() or "429" in error_msg
+
+                if is_rate_limit and attempt < max_retries - 1:
+                    # Exponential backoff with jitter
+                    delay = base_delay * (2 ** attempt) + (time.time() % 1)
+                    print(f"      ⚠️  Rate limit hit (attempt {attempt + 1}/{max_retries}), retrying in {delay:.1f}s...")
+                    time.sleep(delay)
+                else:
+                    # Non-rate-limit error or final attempt - re-raise
+                    if attempt == max_retries - 1:
+                        print(f"      ❌ Failed after {max_retries} attempts: {error_msg}")
+                    raise
+
+        if result is None:
+            raise RuntimeError("Evaluation failed - no result returned")
 
         # Extract scores from Ragas EvaluationResult
         # The Ragas evaluate() function returns an EvaluationResult with .scores dict

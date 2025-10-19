@@ -14,7 +14,7 @@ benchmark:
   # Add/remove providers from this list to change which ones are tested
   providers:
     - llamaindex
-    # - landingai
+    - landingai
     - reducto
 
   # Execution parameters
@@ -22,7 +22,7 @@ benchmark:
     # NEW: Parallel task execution (provider, document) combinations
     max_total_workers: 9          # Total parallel (provider, doc) tasks (e.g., 3 docs × 3 providers = 9)
     max_per_provider_workers: 3   # Max concurrent tasks per provider (rate limiting)
-    max_ragas_workers: 5          # Max concurrent RAGAS evaluations (OpenAI rate limit protection)
+    max_ragas_workers: 3          # Max concurrent RAGAS evaluations (OpenAI rate limit protection)
 
     # DEPRECATED: Legacy settings (kept for backward compatibility)
     max_provider_workers: 3       # Old: Concurrent providers per document (use max_per_provider_workers instead)
