@@ -11,16 +11,19 @@ Coordinates:
 
 import time
 import yaml
+import threading
 from pathlib import Path
 from datetime import datetime
 from collections import defaultdict
+from concurrent.futures import ThreadPoolExecutor, as_completed
 from typing import Dict, List, Tuple
 
 from src.datasets.loader import DatasetLoader
-from src.core.schemas import DocumentData, QuestionData, RunSummary
+from src.core.schemas import DocumentData, QuestionData, RunSummary, ProviderResult, DocumentResult
 from src.core.adapter_factory import AdapterFactory
 from src.core.ragas_evaluator import RagasEvaluator
 from src.core.document_processor import DocumentProcessor
+from src.core.provider_executor import ProviderExecutor
 from src.core.result_saver import ResultSaver
 
 
@@ -59,18 +62,62 @@ class Orchestrator:
         with open(self.config_path) as f:
             return yaml.safe_load(f)
 
+    def _create_task_combinations(
+        self,
+        docs: List[DocumentData],
+        questions_by_doc: Dict[str, List[QuestionData]],
+        adapters: Dict
+    ) -> List[Tuple]:
+        """
+        Generate all (provider, doc, questions) task combinations.
+
+        Args:
+            docs: List of documents
+            questions_by_doc: Questions grouped by document ID
+            adapters: Dict of initialized adapters {name: adapter}
+
+        Returns:
+            List of (provider_name, adapter, doc, questions) tuples
+        """
+        tasks = []
+        for doc in docs:
+            questions = questions_by_doc[doc.doc_id]
+            for provider_name, adapter in adapters.items():
+                tasks.append((provider_name, adapter, doc, questions))
+        return tasks
+
+    def _should_skip_task(self, provider_name: str, doc_id: str) -> bool:
+        """
+        Check if (provider, doc) task should be skipped (resume capability).
+
+        Args:
+            provider_name: Provider name
+            doc_id: Document ID
+
+        Returns:
+            True if task already completed, False otherwise
+        """
+        if not self.output_config.get('resume_enabled', False):
+            return False
+
+        # Check if provider result file exists
+        provider_result_path = self.result_saver.docs_dir / doc_id / f"{provider_name}.json"
+        return provider_result_path.exists()
+
     def run_benchmark(self) -> RunSummary:
         """
-        Execute complete benchmark.
+        Execute complete benchmark with (provider, document) parallelization.
 
-        Workflow:
+        New Workflow (optimized for parallelism):
         1. Load dataset (docs + questions)
         2. Initialize all adapters
-        3. For each doc:
-           - DocumentProcessor.process_doc() → parallel providers
-           - Save results incrementally
-        4. Generate run summary
-        5. Return results
+        3. Create (provider, doc) task combinations
+        4. Execute all tasks in parallel with:
+           - Per-provider rate limiting (semaphores)
+           - RAGAS evaluation queue (semaphore)
+        5. Save results incrementally as tasks complete
+        6. Aggregate results per document
+        7. Generate run summary
 
         Returns:
             RunSummary with all results
@@ -79,7 +126,7 @@ class Orchestrator:
         start_time = time.time()
 
         print("\n" + "="*80)
-        print("🏁 RAGRACE BENCHMARK")
+        print("🏁 RAGRACE BENCHMARK (Parallel Execution)")
         print("="*80)
         print(f"Config: {self.config_path}")
         print(f"Dataset: {self.dataset_config['name']}")
@@ -107,41 +154,137 @@ class Orchestrator:
         evaluator = RagasEvaluator(config=self.eval_config)
         print(f"   ✓ Ragas evaluator ready")
 
-        # Step 4: Process each doc
-        print(f"\n🔄 Processing docs...")
-        doc_processor = DocumentProcessor(
-            evaluator=evaluator,
-            max_workers=self.execution_config['max_provider_workers']
-        )
+        # Step 4: Create semaphores for rate limiting
+        # Per-provider semaphores (limit concurrent tasks per provider)
+        max_per_provider = self.execution_config.get('max_per_provider_workers', 3)
+        provider_semaphores = {
+            provider_name: threading.Semaphore(max_per_provider)
+            for provider_name in self.provider_names
+        }
 
-        doc_results = []
+        # RAGAS evaluation semaphore (limit concurrent evaluations)
+        max_ragas = self.execution_config.get('max_ragas_workers', 5)
+        ragas_semaphore = threading.Semaphore(max_ragas)
 
-        for i, doc in enumerate(docs, 1):
-            print(f"\n{'='*80}")
-            print(f"Document {i}/{len(docs)}: {doc.doc_id}")
+        print(f"\n🔧 Parallelization settings:")
+        print(f"   Max total workers: {self.execution_config.get('max_total_workers', 9)}")
+        print(f"   Max per-provider workers: {max_per_provider}")
+        print(f"   Max RAGAS workers: {max_ragas}")
+
+        # Step 5: Generate task combinations
+        print(f"\n🔄 Generating task combinations...")
+        tasks = self._create_task_combinations(docs, questions_by_doc, adapters)
+
+        # Filter tasks based on resume capability
+        tasks_to_run = []
+        tasks_skipped = 0
+        for provider_name, adapter, doc, questions in tasks:
+            if self._should_skip_task(provider_name, doc.doc_id):
+                tasks_skipped += 1
+                print(f"   ⏭️  Skipping {provider_name} + {doc.doc_id} (already completed)")
+            else:
+                tasks_to_run.append((provider_name, adapter, doc, questions))
+
+        total_tasks = len(tasks)
+        tasks_to_execute = len(tasks_to_run)
+
+        print(f"   ✓ Total task combinations: {total_tasks}")
+        print(f"   ✓ Tasks to execute: {tasks_to_execute} ({total_tasks - tasks_to_execute} skipped)")
+        print(f"   ✓ Expected parallelism: {len(docs)} docs × {len(self.provider_names)} providers")
+
+        # Step 6: Execute tasks in parallel
+        print(f"\n🚀 Executing {tasks_to_execute} tasks in parallel...")
+        print(f"{'='*80}")
+
+        # Create provider executor
+        provider_executor = ProviderExecutor(evaluator=evaluator)
+
+        # Track results per document
+        doc_results_map = defaultdict(dict)  # {doc_id: {provider_name: ProviderResult}}
+
+        # Execute tasks with thread pool
+        max_total_workers = self.execution_config.get('max_total_workers', 9)
+        with ThreadPoolExecutor(max_workers=max_total_workers) as pool:
+            # Submit all tasks
+            future_to_task = {}
+            for provider_name, adapter, doc, questions in tasks_to_run:
+                future = pool.submit(
+                    provider_executor.execute,
+                    provider_name=provider_name,
+                    adapter=adapter,
+                    doc=doc,
+                    questions=questions,
+                    provider_semaphore=provider_semaphores[provider_name],
+                    ragas_semaphore=ragas_semaphore
+                )
+                future_to_task[future] = (provider_name, doc.doc_id, doc.doc_title)
+                print(f"   ✓ Submitted: {provider_name} + {doc.doc_id[:40]}")
+
+            # Collect results as they complete
+            print(f"\n⏳ Waiting for {tasks_to_execute} tasks to complete...")
             print(f"{'='*80}")
 
-            # Check if already completed (resume capability)
-            if (self.output_config.get('resume_enabled', False) and
-                self.result_saver.doc_completed(doc.doc_id)):
-                print(f"⏭️  Skipping (already completed)")
-                continue
+            completed_count = 0
+            for future in as_completed(future_to_task):
+                provider_name, doc_id, doc_title = future_to_task[future]
 
-            # Get questions for this doc
-            questions = questions_by_doc[doc.doc_id]
+                try:
+                    result: ProviderResult = future.result()
 
-            # Process doc with all providers (parallel)
-            doc_result = doc_processor.process_document(
-                doc=doc,
-                questions=questions,
-                adapters=adapters,
-                on_provider_complete=lambda result: self.result_saver.save_provider_result(result)
-            )
+                    # Store result
+                    doc_results_map[doc_id][provider_name] = result
+                    completed_count += 1
 
-            # Save aggregated doc result
-            self.result_saver.save_document_aggregated(doc_result)
+                    # Log completion
+                    status_icon = "✅" if result.status == "success" else "❌"
+                    progress = f"[{completed_count}/{tasks_to_execute}]"
+                    print(f"\n{status_icon} {progress} {provider_name} + {doc_id[:40]}")
+                    print(f"   Duration: {result.duration_seconds:.1f}s")
 
-            doc_results.append(doc_result)
+                    if result.status == "success":
+                        scores_str = ", ".join([f"{k}={v:.3f}" for k, v in result.aggregated_scores.items() if k != 'duration_seconds'])
+                        print(f"   Scores: {scores_str}")
+                    else:
+                        print(f"   Error: {result.error}")
+
+                    # Save provider result incrementally
+                    self.result_saver.save_provider_result(result)
+
+                except Exception as e:
+                    # Handle thread execution errors
+                    print(f"\n❌ [{completed_count + 1}/{tasks_to_execute}] {provider_name} + {doc_id} thread failed: {e}")
+                    completed_count += 1
+
+        # Step 7: Aggregate results per document
+        print(f"\n📊 Aggregating results per document...")
+        doc_results = []
+
+        for doc in docs:
+            if doc.doc_id in doc_results_map:
+                provider_results = doc_results_map[doc.doc_id]
+
+                # Create DocumentResult
+                doc_result = DocumentResult(
+                    doc_id=doc.doc_id,
+                    doc_title=doc.doc_title,
+                    num_questions=len(questions_by_doc[doc.doc_id]),
+                    timestamp=datetime.now().isoformat(),
+                    providers=provider_results
+                )
+
+                # Determine winner (aggregate scores)
+                doc_result.winner = self._aggregate_provider_scores(provider_results)
+
+                # Save aggregated document result
+                self.result_saver.save_document_aggregated(doc_result)
+
+                doc_results.append(doc_result)
+
+                print(f"   ✓ Aggregated results for {doc.doc_id}")
+            else:
+                print(f"   ⚠️  No results for {doc.doc_id} (all tasks skipped or failed)")
+
+        print(f"   ✓ Aggregated {len(doc_results)} documents")
 
         # Step 5: Generate run summary
         print(f"\n📊 Generating run summary...")
@@ -325,6 +468,27 @@ class Orchestrator:
             questions_by_doc[doc_id] = questions
 
         return documents, questions_by_doc
+
+    def _aggregate_provider_scores(self, provider_results: Dict[str, ProviderResult]) -> Dict:
+        """
+        Aggregate scores from provider results for a single document.
+
+        This method extracts scores from each provider and creates
+        a summary structure compatible with the existing result format.
+
+        Args:
+            provider_results: Dict of {provider_name: ProviderResult}
+
+        Returns:
+            Dict with {"provider_scores": {provider: scores}}
+        """
+        provider_scores = {}
+
+        for provider_name, result in provider_results.items():
+            if result.status == "success":
+                provider_scores[provider_name] = result.aggregated_scores
+
+        return {"provider_scores": provider_scores}
 
     def _determine_overall_winner(self, doc_results: List) -> Dict:
         """

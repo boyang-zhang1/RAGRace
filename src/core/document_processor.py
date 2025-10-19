@@ -1,11 +1,17 @@
 """
 Document processor - orchestrates parallel provider execution.
 
-This module:
+DEPRECATED: This class is kept for backward compatibility.
+The new execution model in Orchestrator.run_benchmark() directly
+manages (provider, document) task combinations with better parallelism.
+
+This module (legacy):
 - Creates thread pool for parallel execution
 - Submits ProviderExecutor tasks
 - Collects results as they complete
 - Aggregates scores and determines winner
+
+For new code, use Orchestrator directly instead of DocumentProcessor.
 """
 
 from datetime import datetime
@@ -19,11 +25,18 @@ from src.core.provider_executor import ProviderExecutor
 
 
 class DocumentProcessor:
-    """Processes a single document with multiple providers in parallel."""
+    """
+    DEPRECATED: Processes a single document with multiple providers in parallel.
+
+    This class is maintained for backward compatibility only.
+    New code should use Orchestrator.run_benchmark() directly.
+    """
 
     def __init__(self, evaluator: RagasEvaluator, max_workers: int = 3):
         """
         Initialize document processor.
+
+        DEPRECATED: Use Orchestrator.run_benchmark() for new code.
 
         Args:
             evaluator: Ragas evaluator (shared across all providers)
@@ -88,7 +101,9 @@ class DocumentProcessor:
                     provider_name=provider_name,
                     adapter=adapter,
                     doc=doc,
-                    questions=questions
+                    questions=questions,
+                    provider_semaphore=None,  # No rate limiting in legacy mode
+                    ragas_semaphore=None      # No rate limiting in legacy mode
                 )
                 future_to_provider[future] = provider_name
                 print(f"   ✓ Submitted {provider_name} to thread pool")

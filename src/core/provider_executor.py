@@ -6,11 +6,13 @@ This module executes in a thread and handles:
 - Question querying
 - Response evaluation
 - Error handling
+- Rate limiting via semaphores
 """
 
 import time
+import threading
 from datetime import datetime
-from typing import List
+from typing import List, Optional
 
 from src.adapters.base import BaseAdapter, Document, RAGResponse
 from src.core.schemas import DocumentData, QuestionData, QuestionResult, ProviderResult
@@ -34,26 +36,34 @@ class ProviderExecutor:
         provider_name: str,
         adapter: BaseAdapter,
         doc: DocumentData,
-        questions: List[QuestionData]
+        questions: List[QuestionData],
+        provider_semaphore: Optional[threading.Semaphore] = None,
+        ragas_semaphore: Optional[threading.Semaphore] = None
     ) -> ProviderResult:
         """
-        Execute complete provider workflow on one document.
+        Execute complete provider workflow on one document with rate limiting.
 
         Workflow:
-        1. Ingest document (PDF or text)
-        2. Query all questions
-        3. Evaluate responses with Ragas
-        4. Aggregate scores
-        5. Return structured result
+        1. Acquire provider semaphore (rate limit per provider)
+        2. Ingest document (PDF or text)
+        3. Query all questions
+        4. Acquire RAGAS semaphore (rate limit evaluations)
+        5. Evaluate responses with Ragas
+        6. Release semaphores
+        7. Aggregate scores
+        8. Return structured result
 
         Thread-safe: Each provider gets own adapter instance.
         Error handling: Catches all exceptions and returns error status.
+        Rate limiting: Uses semaphores to limit concurrent operations.
 
         Args:
             provider_name: Name of provider (for logging)
             adapter: Initialized adapter instance
             doc: Document data (PDF path or text content)
             questions: List of questions to ask
+            provider_semaphore: Optional semaphore for per-provider rate limiting
+            ragas_semaphore: Optional semaphore for RAGAS evaluation rate limiting
 
         Returns:
             ProviderResult with status, results, or error
@@ -67,6 +77,12 @@ class ProviderExecutor:
             status="pending",
             timestamp_start=timestamp_start
         )
+
+        # Acquire provider semaphore (rate limiting)
+        if provider_semaphore:
+            print(f"      ⏳ {provider_name} waiting for provider slot...")
+            provider_semaphore.acquire()
+            print(f"      ✓ {provider_name} acquired provider slot")
 
         try:
             # Step 1: Ingest document (PDF or text)
@@ -131,61 +147,74 @@ class ProviderExecutor:
                 ragas_samples.append(ragas_sample)
 
             # Step 3: Evaluate with Ragas (batch evaluation with retry)
-            print(f"      🔍 Evaluating {len(ragas_samples)} responses with Ragas...")
-            max_retries = 3
-            eval_result = None
-            last_error = None
+            # Acquire RAGAS semaphore (rate limiting for OpenAI API)
+            if ragas_semaphore:
+                print(f"      ⏳ {provider_name} waiting for RAGAS evaluation slot...")
+                ragas_semaphore.acquire()
+                print(f"      ✓ {provider_name} acquired RAGAS slot")
 
-            for attempt in range(max_retries):
-                try:
-                    eval_result = self.evaluator.evaluate_samples(ragas_samples)
+            try:
+                print(f"      🔍 Evaluating {len(ragas_samples)} responses with Ragas...")
+                max_retries = 3
+                eval_result = None
+                last_error = None
 
-                    # Check for NaN values in scores
-                    has_nan = any(
-                        score != score  # NaN != NaN is True
-                        for score in eval_result.scores.values()
-                    )
+                for attempt in range(max_retries):
+                    try:
+                        eval_result = self.evaluator.evaluate_samples(ragas_samples)
 
-                    if has_nan:
-                        print(f"      ⚠️  NaN detected in evaluation scores (attempt {attempt + 1}/{max_retries})")
+                        # Check for NaN values in scores
+                        has_nan = any(
+                            score != score  # NaN != NaN is True
+                            for score in eval_result.scores.values()
+                        )
+
+                        if has_nan:
+                            print(f"      ⚠️  NaN detected in evaluation scores (attempt {attempt + 1}/{max_retries})")
+                            if attempt < max_retries - 1:
+                                time.sleep(2)  # Brief delay before retry
+                                continue
+                            else:
+                                # Last attempt - clean NaN values
+                                cleaned_scores = {}
+                                for metric, score in eval_result.scores.items():
+                                    if score != score:  # NaN check
+                                        cleaned_scores[metric] = 0.0
+                                        print(f"      ⚠️  Replacing NaN with 0.0 for {metric}")
+                                    else:
+                                        cleaned_scores[metric] = score
+                                eval_result.scores = cleaned_scores
+
+                        # Success - break retry loop
+                        break
+
+                    except Exception as e:
+                        last_error = e
+                        print(f"      ⚠️  Evaluation failed (attempt {attempt + 1}/{max_retries}): {e}")
                         if attempt < max_retries - 1:
                             time.sleep(2)  # Brief delay before retry
-                            continue
                         else:
-                            # Last attempt - clean NaN values
-                            cleaned_scores = {}
-                            for metric, score in eval_result.scores.items():
-                                if score != score:  # NaN check
-                                    cleaned_scores[metric] = 0.0
-                                    print(f"      ⚠️  Replacing NaN with 0.0 for {metric}")
-                                else:
-                                    cleaned_scores[metric] = score
-                            eval_result.scores = cleaned_scores
+                            raise
 
-                    # Success - break retry loop
-                    break
+                if eval_result is None:
+                    raise RuntimeError(f"Evaluation failed after {max_retries} attempts: {last_error}")
 
-                except Exception as e:
-                    last_error = e
-                    print(f"      ⚠️  Evaluation failed (attempt {attempt + 1}/{max_retries}): {e}")
-                    if attempt < max_retries - 1:
-                        time.sleep(2)  # Brief delay before retry
-                    else:
-                        raise
+                # Step 4: Extract per-question scores
+                # Ragas returns averaged scores - we use same scores for all questions
+                # (Ragas doesn't provide per-sample breakdown in current API)
+                for question_result in question_results:
+                    question_result.evaluation_scores = eval_result.scores.copy()
 
-            if eval_result is None:
-                raise RuntimeError(f"Evaluation failed after {max_retries} attempts: {last_error}")
+                # Step 5: Aggregate scores (already done by Ragas)
+                result.questions = question_results
+                result.aggregated_scores = eval_result.scores.copy()
+                result.status = "success"
 
-            # Step 4: Extract per-question scores
-            # Ragas returns averaged scores - we use same scores for all questions
-            # (Ragas doesn't provide per-sample breakdown in current API)
-            for question_result in question_results:
-                question_result.evaluation_scores = eval_result.scores.copy()
-
-            # Step 5: Aggregate scores (already done by Ragas)
-            result.questions = question_results
-            result.aggregated_scores = eval_result.scores.copy()
-            result.status = "success"
+            finally:
+                # Release RAGAS semaphore
+                if ragas_semaphore:
+                    ragas_semaphore.release()
+                    print(f"      ✓ {provider_name} released RAGAS slot")
 
         except Exception as e:
             # Error handling: log error and return error status
@@ -193,6 +222,11 @@ class ProviderExecutor:
             result.error = f"{type(e).__name__}: {str(e)}"
 
         finally:
+            # Release provider semaphore
+            if provider_semaphore:
+                provider_semaphore.release()
+                print(f"      ✓ {provider_name} released provider slot")
+
             # Record timing
             end_time = time.time()
             result.duration_seconds = end_time - start_time

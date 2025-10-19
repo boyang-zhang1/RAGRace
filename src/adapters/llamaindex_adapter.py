@@ -17,6 +17,13 @@ try:
     from llama_index.embeddings.openai import OpenAIEmbedding
     from llama_index.llms.openai import OpenAI
     from llama_parse import LlamaParse
+
+    # Download NLTK data if not already present (required by LlamaIndex)
+    import nltk
+    # Always try to download (it will skip if already present)
+    nltk.download('punkt', quiet=True)
+    nltk.download('punkt_tab', quiet=True)
+
     LLAMAINDEX_AVAILABLE = True
 except ImportError:
     LLAMAINDEX_AVAILABLE = False
