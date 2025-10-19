@@ -20,9 +20,9 @@ benchmark:
   # Execution parameters
   execution:
     # NEW: Parallel task execution (provider, document) combinations
-    max_total_workers: 9          # Total parallel (provider, doc) tasks (e.g., 3 docs × 3 providers = 9)
-    max_per_provider_workers: 3   # Max concurrent tasks per provider (rate limiting)
-    max_ragas_workers: 3          # Max concurrent RAGAS evaluations (OpenAI rate limit protection)
+    max_total_workers: 6          # Total parallel (provider, doc) tasks (conservative for 200K TPM)
+    max_per_provider_workers: 4   # Max concurrent tasks per provider (rate limiting)
+    max_ragas_workers: 2          # Max concurrent RAGAS evaluations (OpenAI rate limit protection)
 
     # DEPRECATED: Legacy settings (kept for backward compatibility)
     max_provider_workers: 3       # Old: Concurrent providers per document (use max_per_provider_workers instead)
