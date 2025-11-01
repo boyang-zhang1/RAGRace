@@ -1,0 +1,179 @@
+generator client {
+  provider             = "prisma-client-py"
+  interface            = "asyncio"
+  recursive_type_depth = 5
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DIRECT_URL")
+}
+
+// Users & Authentication
+model User {
+  id               String         @id @default(uuid())
+  email            String         @unique
+  apiKey           String         @unique @map("api_key")  // SHA-256 hashed
+  userType         UserType       @map("user_type")
+  creditsRemaining Int            @default(0) @map("credits_remaining")
+  createdAt        DateTime       @default(now()) @map("created_at")
+  updatedAt        DateTime       @updatedAt @map("updated_at")
+
+  benchmarkRuns    BenchmarkRun[]
+  apiRequests      ApiRequest[]
+
+  @@index([apiKey])
+  @@map("users")
+}
+
+enum UserType {
+  PAID
+  FREE
+}
+
+// Benchmark Runs
+model BenchmarkRun {
+  id                  String             @id @default(uuid())
+  runId               String             @unique @map("run_id")  // e.g., "run_20251030_163137"
+  userId              String?            @map("user_id")
+  user                User?              @relation(fields: [userId], references: [id], onDelete: SetNull)
+
+  datasetName         String             @map("dataset_name")  // 'qasper' | 'policyqa' | 'squad2'
+  datasetSplit        String             @map("dataset_split")  // 'train' | 'validation' | 'test'
+  providers           String[]           // ['llamaindex', 'reducto']
+  numDocs             Int                @map("num_docs")
+  numQuestionsTotal   Int                @map("num_questions_total")
+
+  status              BenchmarkStatus
+  config              Json               // Full benchmark config
+  durationSeconds     Float?             @map("duration_seconds")
+  errorMessage        String?            @map("error_message")
+
+  startedAt           DateTime           @map("started_at")
+  completedAt         DateTime?          @map("completed_at")
+  createdAt           DateTime           @default(now()) @map("created_at")
+
+  providerResults     ProviderResult[]
+
+  @@index([userId])
+  @@index([status])
+  @@index([datasetName, datasetSplit])
+  @@map("benchmark_runs")
+}
+
+enum BenchmarkStatus {
+  QUEUED
+  RUNNING
+  COMPLETED
+  FAILED
+}
+
+// Documents
+model Document {
+  id              String             @id @default(uuid())
+  docId           String             @map("doc_id")  // Original ID from dataset
+  datasetName     String             @map("dataset_name")
+  docTitle        String             @map("doc_title")
+  pdfPath         String?            @map("pdf_path")  // Supabase Storage path
+  pdfUrl          String?            @map("pdf_url")   // Public URL
+  pdfSizeBytes    BigInt?            @map("pdf_size_bytes")
+  metadata        Json               @default("{}")
+  createdAt       DateTime           @default(now()) @map("created_at")
+
+  questions       Question[]
+  providerResults ProviderResult[]
+
+  @@unique([docId, datasetName])
+  @@index([datasetName])
+  @@map("documents")
+}
+
+// Questions
+model Question {
+  id              String             @id @default(uuid())
+  questionId      String             @map("question_id")
+  documentId      String             @map("document_id")
+  document        Document           @relation(fields: [documentId], references: [id], onDelete: Cascade)
+
+  question        String
+  groundTruth     String             @map("ground_truth")
+  metadata        Json               @default("{}")
+  createdAt       DateTime           @default(now()) @map("created_at")
+
+  questionResults QuestionResult[]
+
+  @@unique([questionId, documentId])
+  @@index([documentId])
+  @@map("questions")
+}
+
+// Provider Results (per run, per document, per provider)
+model ProviderResult {
+  id                String             @id @default(uuid())
+  runId             String             @map("run_id")
+  run               BenchmarkRun       @relation(fields: [runId], references: [id], onDelete: Cascade)
+  documentId        String             @map("document_id")
+  document          Document           @relation(fields: [documentId], references: [id], onDelete: Cascade)
+
+  provider          String
+  status            ProviderStatus
+  error             String?
+  indexId           String?            @map("index_id")
+
+  aggregatedScores  Json               @default("{}") @map("aggregated_scores")  // {metric: avg_score}
+  durationSeconds   Float?             @map("duration_seconds")
+
+  startedAt         DateTime?          @map("started_at")
+  completedAt       DateTime?          @map("completed_at")
+  createdAt         DateTime           @default(now()) @map("created_at")
+
+  questionResults   QuestionResult[]
+
+  @@unique([runId, documentId, provider])
+  @@index([runId])
+  @@index([documentId])
+  @@map("provider_results")
+}
+
+enum ProviderStatus {
+  SUCCESS
+  ERROR
+}
+
+// Question Results (per provider result, per question)
+model QuestionResult {
+  id                  String         @id @default(uuid())
+  providerResultId    String         @map("provider_result_id")
+  providerResult      ProviderResult @relation(fields: [providerResultId], references: [id], onDelete: Cascade)
+  questionId          String         @map("question_id")
+  question            Question       @relation(fields: [questionId], references: [id], onDelete: Cascade)
+
+  responseAnswer      String         @map("response_answer")
+  responseContext     String[]       @default([]) @map("response_context")  // Array of retrieved chunks
+  responseLatencyMs   Float?         @map("response_latency_ms")
+  responseMetadata    Json           @default("{}") @map("response_metadata")
+  evaluationScores    Json           @default("{}") @map("evaluation_scores")  // {metric: score}
+
+  createdAt           DateTime       @default(now()) @map("created_at")
+
+  @@unique([providerResultId, questionId])
+  @@index([providerResultId])
+  @@map("question_results")
+}
+
+// API Usage Tracking
+model ApiRequest {
+  id          String    @id @default(uuid())
+  userId      String    @map("user_id")
+  user        User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  endpoint    String
+  method      String
+  statusCode  Int?      @map("status_code")
+  creditsUsed Int       @default(0) @map("credits_used")
+  createdAt   DateTime  @default(now()) @map("created_at")
+
+  @@index([userId])
+  @@index([createdAt])
+  @@map("api_requests")
+}

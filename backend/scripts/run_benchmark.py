@@ -37,13 +37,15 @@ from pathlib import Path
 from dotenv import load_dotenv
 
 # Add project root to Python path
-project_root = Path(__file__).parent.parent
+project_root = Path(__file__).parent.parent  # backend/scripts -> backend
 sys.path.insert(0, str(project_root))
 
-# Load environment variables from .env file (silently)
+# Load environment variables from backend/.env file
 env_file = project_root / '.env'
 if env_file.exists():
     load_dotenv(env_file)
+else:
+    print("⚠️  No .env file found in backend/ (using system environment variables)")
 
 from src.core.orchestrator import Orchestrator
 

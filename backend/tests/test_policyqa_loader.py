@@ -5,16 +5,16 @@ from src.datasets.loader import DatasetLoader
 
 
 def test_policyqa_load_minimal():
-    """Test loading a minimal sample of PolicyQA dataset (10 samples for speed)."""
+    """Test loading a minimal sample of PolicyQA dataset (2 samples for speed)."""
     dataset = DatasetLoader.load_policyqa(
         split='train',
-        max_samples=10
+        max_samples=2
     )
 
     # Verify dataset structure
     assert dataset.dataset_name == 'PolicyQA'
     assert len(dataset) > 0, "Should have samples"
-    assert len(dataset) <= 10, "Should respect max_samples limit"
+    assert len(dataset) <= 2, "Should respect max_samples limit"
 
     # Verify sample structure
     sample = dataset.samples[0]
@@ -42,7 +42,7 @@ def test_policyqa_all_splits():
     splits = ['train', 'dev', 'test']
 
     for split in splits:
-        dataset = DatasetLoader.load_policyqa(split=split, max_samples=5)
+        dataset = DatasetLoader.load_policyqa(split=split, max_samples=2)
         assert len(dataset) > 0, f"{split} split should have samples"
         assert dataset.metadata['split'] == split
         print(f"✓ {split} split loaded: {len(dataset)} samples")
