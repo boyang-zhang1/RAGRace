@@ -44,3 +44,10 @@ playwright>=1.40.0  # HTML to PDF conversion (preserves document structure)
 
 # Add more providers as needed
 # landing-ai
+
+# Web API
+fastapi==0.104.1
+uvicorn[standard]==0.24.0
+
+# Database ORM
+prisma==0.11.0
