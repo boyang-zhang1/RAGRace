@@ -19,34 +19,26 @@ logger = logging.getLogger(__name__)
 router = APIRouter()
 
 
-def verify_api_key(x_api_key: Optional[str] = Header(None)) -> str:
+def verify_api_key(x_api_key: Optional[str] = Header(None)) -> Optional[str]:
     """
-    Simple API key verification.
+    Optional API key verification for user authentication.
 
-    For now, just checks that key is present.
-    Future: Validate against users table.
+    NOTE: This is optional now. Users provide provider API keys in the request body.
+    X-API-Key header is only used for user-level authentication/billing (future feature).
 
     Args:
-        x_api_key: API key from header
+        x_api_key: Optional API key from header
 
     Returns:
-        API key if valid
-
-    Raises:
-        HTTPException: If API key missing
+        API key if provided, None otherwise
     """
-    if not x_api_key:
-        raise HTTPException(
-            status_code=403,
-            detail="API key required. Include 'X-API-Key' header to trigger benchmarks."
-        )
-    return x_api_key
+    return x_api_key  # Return None if not provided (allowed)
 
 
 @router.post("", response_model=BenchmarkResponse)
 async def create_benchmark(
     request: BenchmarkRequest,
-    api_key: str = Depends(verify_api_key)
+    api_key: Optional[str] = Depends(verify_api_key)
 ):
     """
     Create and execute a new benchmark run.
@@ -158,6 +150,37 @@ def _create_config_from_request(request: BenchmarkRequest) -> dict:
     Returns:
         Config dict ready for YAML serialization
     """
+    # Build provider_configs with user-provided API keys (if any)
+    provider_configs = {}
+
+    if request.api_keys:
+        for provider in request.providers:
+            config = {}
+
+            if provider == 'llamaindex':
+                # LlamaIndex needs: OpenAI key + LlamaIndex cloud key
+                if 'openai' in request.api_keys:
+                    config['api_key'] = request.api_keys['openai']
+                if 'llamaindex' in request.api_keys:
+                    config['llamacloud_api_key'] = request.api_keys['llamaindex']
+
+            elif provider == 'landingai':
+                # LandingAI needs: Vision Agent key + OpenAI key
+                if 'vision_agent' in request.api_keys:
+                    config['api_key'] = request.api_keys['vision_agent']
+                if 'openai' in request.api_keys:
+                    config['openai_api_key'] = request.api_keys['openai']
+
+            elif provider == 'reducto':
+                # Reducto needs: Reducto key + OpenAI key
+                if 'reducto' in request.api_keys:
+                    config['api_key'] = request.api_keys['reducto']
+                if 'openai' in request.api_keys:
+                    config['openai_api_key'] = request.api_keys['openai']
+
+            if config:
+                provider_configs[provider] = config
+
     return {
         "benchmark": {
             "dataset": {
@@ -168,7 +191,7 @@ def _create_config_from_request(request: BenchmarkRequest) -> dict:
                 "filter_unanswerable": request.filter_unanswerable,
             },
             "providers": request.providers,
-            "provider_configs": {},  # Use defaults from providers.yaml
+            "provider_configs": provider_configs,  # Include user-provided keys
             "execution": {
                 # Conservative defaults for API
                 "max_total_workers": 4,

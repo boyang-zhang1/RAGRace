@@ -2,7 +2,7 @@
 Request and response models for benchmark API endpoints.
 """
 
-from typing import List, Optional
+from typing import List, Optional, Dict
 from pydantic import BaseModel, Field
 
 
@@ -14,10 +14,14 @@ class BenchmarkRequest(BaseModel):
         {
             "dataset": "qasper",
             "split": "train",
-            "providers": ["llamaindex", "reducto"],
-            "max_docs": 5,
-            "max_questions_per_doc": 10,
-            "filter_unanswerable": true
+            "providers": ["llamaindex"],
+            "max_docs": 2,
+            "max_questions_per_doc": 3,
+            "filter_unanswerable": true,
+            "api_keys": {
+                "openai": "sk-...",
+                "llamaindex": "llx-..."
+            }
         }
     """
     dataset: str = Field(..., description="Dataset name (qasper, policyqa, squad2)")
@@ -26,6 +30,10 @@ class BenchmarkRequest(BaseModel):
     max_docs: Optional[int] = Field(default=None, description="Maximum number of documents (null = all)")
     max_questions_per_doc: Optional[int] = Field(default=None, description="Maximum questions per document (null = all)")
     filter_unanswerable: bool = Field(default=True, description="Filter out unanswerable questions")
+    api_keys: Optional[Dict[str, str]] = Field(
+        default=None,
+        description="API keys for providers. Keys: 'openai', 'llamaindex', 'vision_agent', 'reducto'. If not provided, falls back to environment variables."
+    )
 
     class Config:
         json_schema_extra = {
@@ -35,7 +43,11 @@ class BenchmarkRequest(BaseModel):
                 "providers": ["llamaindex"],
                 "max_docs": 2,
                 "max_questions_per_doc": 3,
-                "filter_unanswerable": True
+                "filter_unanswerable": True,
+                "api_keys": {
+                    "openai": "sk-...",
+                    "llamaindex": "llx-..."
+                }
             }
         }
 

@@ -64,12 +64,18 @@ class AdapterFactory:
 
         # Initialize based on provider type
         if provider_lower == 'llamaindex':
-            api_key = os.getenv(config.get('api_key_env', 'OPENAI_API_KEY'))
-            cloud_api_key = os.getenv(config.get('cloud_api_key_env', 'LLAMAINDEX_API_KEY'))
+            # Try config first (user-provided), then env vars (testing fallback)
+            api_key = config.get('api_key') or os.getenv('OPENAI_API_KEY')
+            cloud_api_key = config.get('llamacloud_api_key') or os.getenv('LLAMAINDEX_API_KEY')
+
             if not api_key:
-                raise ValueError(f"API key not found: {config.get('api_key_env', 'OPENAI_API_KEY')}")
+                raise ValueError(
+                    "OpenAI API key required. Provide via api_keys in request or set OPENAI_API_KEY env variable."
+                )
             if not cloud_api_key:
-                raise ValueError(f"Cloud API key not found: {config.get('cloud_api_key_env', 'LLAMAINDEX_API_KEY')}")
+                raise ValueError(
+                    "LlamaIndex API key required. Provide via api_keys in request or set LLAMAINDEX_API_KEY env variable."
+                )
 
             adapter.initialize(
                 api_key=api_key,
@@ -78,10 +84,18 @@ class AdapterFactory:
             )
 
         elif provider_lower == 'landingai':
-            api_key = os.getenv(config.get('api_key_env', 'VISION_AGENT_API_KEY'))
-            openai_key = os.getenv(config.get('openai_api_key_env', 'OPENAI_API_KEY'))
-            if not api_key or not openai_key:
-                raise ValueError("LandingAI requires VISION_AGENT_API_KEY and OPENAI_API_KEY")
+            # Try config first (user-provided), then env vars (testing fallback)
+            api_key = config.get('api_key') or os.getenv('VISION_AGENT_API_KEY')
+            openai_key = config.get('openai_api_key') or os.getenv('OPENAI_API_KEY')
+
+            if not api_key:
+                raise ValueError(
+                    "Vision Agent API key required. Provide via api_keys in request or set VISION_AGENT_API_KEY env variable."
+                )
+            if not openai_key:
+                raise ValueError(
+                    "OpenAI API key required. Provide via api_keys in request or set OPENAI_API_KEY env variable."
+                )
 
             adapter.initialize(
                 api_key=api_key,
@@ -90,10 +104,18 @@ class AdapterFactory:
             )
 
         elif provider_lower == 'reducto':
-            api_key = os.getenv(config.get('api_key_env', 'REDUCTO_API_KEY'))
-            openai_key = os.getenv(config.get('openai_api_key_env', 'OPENAI_API_KEY'))
-            if not api_key or not openai_key:
-                raise ValueError("Reducto requires REDUCTO_API_KEY and OPENAI_API_KEY")
+            # Try config first (user-provided), then env vars (testing fallback)
+            api_key = config.get('api_key') or os.getenv('REDUCTO_API_KEY')
+            openai_key = config.get('openai_api_key') or os.getenv('OPENAI_API_KEY')
+
+            if not api_key:
+                raise ValueError(
+                    "Reducto API key required. Provide via api_keys in request or set REDUCTO_API_KEY env variable."
+                )
+            if not openai_key:
+                raise ValueError(
+                    "OpenAI API key required. Provide via api_keys in request or set OPENAI_API_KEY env variable."
+                )
 
             adapter.initialize(
                 api_key=api_key,
