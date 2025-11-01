@@ -1,0 +1,39 @@
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+*.egg-info/
+.pytest_cache/
+
+# Environment
+.env
+.env.local
+*.env
+
+# Data files
+data/
+cache/
+results/
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+
+# Git
+.git/
+.gitignore
+
+# Documentation
+local_docs/
+*.md
+
+# Tests
+tests/
+test_*.py
+
+# Config (will be symlinked or configured in Railway)
+config/providers.generated.yaml
