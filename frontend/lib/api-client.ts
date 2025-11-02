@@ -103,6 +103,18 @@ class ApiClient {
   }
 
   /**
+   * Get all documents and Q&A results for a dataset across all runs
+   *
+   * @param datasetName Dataset identifier (e.g., 'qasper', 'squad2')
+   * @returns Document-level breakdown with Q&A results (same structure as RunDetail)
+   */
+  async getDatasetDocuments(datasetName: string): Promise<RunDetail> {
+    return this.fetchWithError<RunDetail>(
+      `/api/v1/datasets/${encodeURIComponent(datasetName)}/documents`
+    );
+  }
+
+  /**
    * Get aggregated provider performance for a dataset
    *
    * @param datasetName Dataset identifier (e.g., 'qasper', 'squad2')

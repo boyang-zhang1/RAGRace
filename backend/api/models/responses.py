@@ -74,7 +74,7 @@ class RunDetail(BaseModel):
     num_docs: int
     num_questions: int
     config: Dict[str, Any] = Field(default_factory=dict, description="Full benchmark configuration")
-    started_at: datetime
+    started_at: Optional[datetime] = None
     completed_at: Optional[datetime] = None
     duration_seconds: Optional[float] = None
     error_message: Optional[str] = None

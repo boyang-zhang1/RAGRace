@@ -8,20 +8,19 @@ export function Navbar() {
 
   const links = [
     {
-      href: '/',
+      href: '/datasets',
+      label: 'Datasets',
+      isActive: pathname === '/' || pathname?.startsWith('/datasets'),
+    },
+    {
+      href: '/results',
       label: 'Results',
-      isActive:
-        pathname === '/' || pathname?.startsWith('/results'),
+      isActive: pathname?.startsWith('/results'),
     },
     {
       href: '/dashboard',
       label: 'Run Benchmark',
       isActive: pathname?.startsWith('/dashboard'),
-    },
-    {
-      href: '/datasets',
-      label: 'Datasets',
-      isActive: pathname?.startsWith('/datasets'),
     },
   ];
 
@@ -30,7 +29,7 @@ export function Navbar() {
       <div className="container mx-auto px-4 py-4">
         <div className="flex items-center justify-between">
           {/* Logo / Brand */}
-          <Link href="/" className="text-2xl font-bold">
+          <Link href="/datasets" className="text-2xl font-bold">
             RAGRace
           </Link>
 

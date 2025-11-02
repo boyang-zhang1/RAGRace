@@ -1,4 +1,5 @@
 import { apiClient } from '@/lib/api-client';
+import Link from 'next/link';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { DatasetPerformanceCard } from '@/components/datasets/DatasetPerformanceCard';
@@ -32,13 +33,15 @@ export default async function DatasetsPage() {
 
         <div className="space-y-8">
           {datasetResults.map(({ dataset, performance }) => (
-            <div key={dataset.name} className="space-y-4">
-              {/* Dataset Header */}
-              <Card>
+            <Link key={dataset.name} href={`/datasets/${dataset.name}`}>
+              <Card className="hover:bg-muted/50 transition-colors cursor-pointer">
+                {/* Dataset Header */}
                 <CardHeader>
                   <div className="flex items-start justify-between">
                     <div>
-                      <CardTitle className="text-2xl">{dataset.display_name}</CardTitle>
+                      <CardTitle className="text-2xl hover:text-primary transition-colors">
+                        {dataset.display_name}
+                      </CardTitle>
                       <CardDescription className="mt-1">{dataset.description}</CardDescription>
                     </div>
                     <Badge variant="outline" className="ml-4">
@@ -46,8 +49,10 @@ export default async function DatasetsPage() {
                     </Badge>
                   </div>
                 </CardHeader>
+
                 <CardContent>
-                  <div className="grid grid-cols-2 md:grid-cols-4 gap-4 text-sm">
+                  {/* Dataset Metadata */}
+                  <div className="grid grid-cols-2 md:grid-cols-4 gap-4 text-sm mb-6">
                     <div>
                       <p className="text-muted-foreground">Available Splits</p>
                       <div className="flex flex-wrap gap-1 mt-1">
@@ -79,25 +84,26 @@ export default async function DatasetsPage() {
                       </>
                     )}
                   </div>
+
+                  {/* Performance Results */}
+                  {performance && performance.providers.length > 0 ? (
+                    <div className="border-t pt-6">
+                      <DatasetPerformanceCard
+                        datasetName={dataset.name}
+                        providers={performance.providers}
+                        totalDocuments={performance.total_documents}
+                        totalRuns={performance.total_runs}
+                        embedded={true}
+                      />
+                    </div>
+                  ) : (
+                    <div className="py-8 text-center text-muted-foreground border-t">
+                      No benchmark results available for this dataset yet.
+                    </div>
+                  )}
                 </CardContent>
               </Card>
-
-              {/* Performance Results */}
-              {performance && performance.providers.length > 0 ? (
-                <DatasetPerformanceCard
-                  datasetName={dataset.name}
-                  providers={performance.providers}
-                  totalDocuments={performance.total_documents}
-                  totalRuns={performance.total_runs}
-                />
-              ) : (
-                <Card>
-                  <CardContent className="py-8 text-center text-muted-foreground">
-                    No benchmark results available for this dataset yet.
-                  </CardContent>
-                </Card>
-              )}
-            </div>
+            </Link>
           ))}
         </div>
       </div>

@@ -50,7 +50,7 @@ export interface RunDetail {
   num_docs: number;
   num_questions: number;
   config: Record<string, any>;  // Full benchmark config
-  started_at: string;
+  started_at: string | null;
   completed_at: string | null;
   duration_seconds: number | null;
   error_message: string | null;

@@ -1,7 +1,6 @@
 import { Suspense } from 'react';
 import Link from 'next/link';
 import { notFound } from 'next/navigation';
-import { format } from 'date-fns';
 import { apiClient } from '@/lib/api-client';
 import { RunDetails } from '@/components/results/RunDetails';
 import { OverallResultsCard } from '@/components/results/OverallResultsCard';
@@ -11,92 +10,67 @@ import { Skeleton } from '@/components/ui/skeleton';
 import { ArrowLeft } from 'lucide-react';
 
 interface PageProps {
-  params: Promise<{ run_id: string }>;
+  params: Promise<{ name: string }>;
 }
 
-async function RunDetailContent({ runId }: { runId: string }) {
+async function DatasetDetailContent({ datasetName }: { datasetName: string }) {
   try {
-    const run = await apiClient.getRunDetail(runId);
+    const data = await apiClient.getDatasetDocuments(datasetName);
 
-    const getStatusBadgeVariant = (status: string) => {
-      switch (status) {
-        case 'completed':
-          return 'default';
-        case 'running':
-          return 'secondary';
-        case 'failed':
-          return 'destructive';
-        default:
-          return 'outline';
-      }
-    };
+    // Get dataset display name
+    const datasets = await apiClient.getDatasets();
+    const datasetInfo = datasets.find((d) => d.name === datasetName);
+    const displayName = datasetInfo?.display_name || datasetName.toUpperCase();
 
     return (
       <div className="space-y-6">
         {/* Back Link */}
         <Link
-          href="/"
+          href="/datasets"
           className="inline-flex items-center text-sm text-muted-foreground hover:text-primary"
         >
           <ArrowLeft className="mr-2 h-4 w-4" />
-          Back to Results
+          Back to Datasets
         </Link>
 
-        {/* Run Header */}
+        {/* Dataset Header */}
         <div>
-          <h1 className="text-3xl font-bold tracking-tight">{run.run_id}</h1>
-          <p className="text-muted-foreground mt-2">Detailed benchmark run results</p>
+          <h1 className="text-3xl font-bold tracking-tight">{displayName}</h1>
+          <p className="text-muted-foreground mt-2">
+            Aggregated results across all benchmark runs
+          </p>
         </div>
 
-        {/* Run Metadata Card */}
+        {/* Dataset Metadata Card */}
         <Card>
           <CardContent className="pt-6">
             <div className="grid grid-cols-2 md:grid-cols-4 gap-6">
               <div>
                 <p className="text-sm font-medium text-muted-foreground">Dataset</p>
-                <p className="text-lg font-semibold mt-1">
-                  {run.dataset}
-                  <span className="text-sm text-muted-foreground ml-2">({run.split})</span>
-                </p>
+                <p className="text-lg font-semibold mt-1">{datasetName}</p>
               </div>
 
               <div>
-                <p className="text-sm font-medium text-muted-foreground">Status</p>
+                <p className="text-sm font-medium text-muted-foreground">Aggregation Scope</p>
                 <div className="mt-1">
-                  <Badge variant={getStatusBadgeVariant(run.status)}>{run.status}</Badge>
+                  <Badge variant="outline">All Splits</Badge>
                 </div>
               </div>
 
               <div>
                 <p className="text-sm font-medium text-muted-foreground">Documents</p>
-                <p className="text-lg font-semibold mt-1">{run.num_docs}</p>
+                <p className="text-lg font-semibold mt-1">{data.num_docs}</p>
               </div>
 
               <div>
                 <p className="text-sm font-medium text-muted-foreground">Questions</p>
-                <p className="text-lg font-semibold mt-1">{run.num_questions}</p>
-              </div>
-
-              <div>
-                <p className="text-sm font-medium text-muted-foreground">Started</p>
-                <p className="text-sm mt-1">
-                  {run.started_at ? format(new Date(run.started_at), 'PPpp') : 'N/A'}
-                </p>
-              </div>
-
-              <div>
-                <p className="text-sm font-medium text-muted-foreground">Duration</p>
-                <p className="text-sm mt-1">
-                  {run.duration_seconds
-                    ? `${(run.duration_seconds / 60).toFixed(2)} minutes`
-                    : 'N/A'}
-                </p>
+                <p className="text-lg font-semibold mt-1">{data.num_questions}</p>
               </div>
 
               <div className="col-span-2">
-                <p className="text-sm font-medium text-muted-foreground">Providers</p>
+                <p className="text-sm font-medium text-muted-foreground">Providers Tested</p>
                 <div className="flex flex-wrap gap-2 mt-1">
-                  {run.providers.map((provider) => (
+                  {data.providers.map((provider) => (
                     <Badge key={provider} variant="outline">
                       {provider}
                     </Badge>
@@ -104,25 +78,21 @@ async function RunDetailContent({ runId }: { runId: string }) {
                 </div>
               </div>
             </div>
-
-            {run.error_message && (
-              <div className="mt-6 p-4 bg-destructive/10 border border-destructive rounded-lg">
-                <p className="text-sm font-medium text-destructive">Error:</p>
-                <p className="text-sm text-destructive/80 mt-1">{run.error_message}</p>
-              </div>
-            )}
           </CardContent>
         </Card>
 
         {/* Overall Results */}
-        {run.documents.length > 0 && (
-          <OverallResultsCard documents={run.documents} providers={run.providers} />
+        {data.documents.length > 0 && (
+          <OverallResultsCard documents={data.documents} providers={data.providers} />
         )}
 
         {/* Document Results */}
         <div>
           <h2 className="text-2xl font-bold mb-4">Document Results</h2>
-          <RunDetails documents={run.documents} providers={run.providers} />
+          <p className="text-sm text-muted-foreground mb-4">
+            Showing latest successful results for each provider per document
+          </p>
+          <RunDetails documents={data.documents} providers={data.providers} />
         </div>
       </div>
     );
@@ -133,16 +103,23 @@ async function RunDetailContent({ runId }: { runId: string }) {
 
     return (
       <div className="text-center py-12">
-        <h2 className="text-2xl font-bold text-destructive mb-2">Error Loading Run Details</h2>
+        <h2 className="text-2xl font-bold text-destructive mb-2">Error Loading Dataset Details</h2>
         <p className="text-muted-foreground">
-          {error instanceof Error ? error.message : 'Failed to load run details'}
+          {error instanceof Error ? error.message : 'Failed to load dataset details'}
         </p>
+        <Link
+          href="/datasets"
+          className="inline-flex items-center text-sm text-primary hover:underline mt-4"
+        >
+          <ArrowLeft className="mr-2 h-4 w-4" />
+          Back to Datasets
+        </Link>
       </div>
     );
   }
 }
 
-function RunDetailLoading() {
+function DatasetDetailLoading() {
   return (
     <div className="space-y-6">
       {/* Back Link Skeleton */}
@@ -153,9 +130,9 @@ function RunDetailLoading() {
         <div className="inline-flex flex-col items-center gap-4">
           <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-primary"></div>
           <div>
-            <h2 className="text-2xl font-bold mb-2">Loading Results</h2>
+            <h2 className="text-2xl font-bold mb-2">Loading Dataset Results</h2>
             <p className="text-muted-foreground">
-              Fetching benchmark data from database...
+              Aggregating benchmark data across all runs...
             </p>
           </div>
         </div>
@@ -187,12 +164,12 @@ function RunDetailLoading() {
   );
 }
 
-export default async function RunDetailPage({ params }: PageProps) {
-  const { run_id } = await params;
+export default async function DatasetDetailPage({ params }: PageProps) {
+  const { name } = await params;
 
   return (
-    <Suspense fallback={<RunDetailLoading />}>
-      <RunDetailContent runId={run_id} />
+    <Suspense fallback={<DatasetDetailLoading />}>
+      <DatasetDetailContent datasetName={name} />
     </Suspense>
   );
 }

@@ -1,7 +1,6 @@
 'use client';
 
 import { useState } from 'react';
-import { useRouter } from 'next/navigation';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer } from 'recharts';
@@ -14,6 +13,7 @@ interface DatasetPerformanceCardProps {
   providers: ProviderPerformance[];
   totalDocuments: number;
   totalRuns: number;
+  embedded?: boolean; // New prop to control card wrapper
 }
 
 export function DatasetPerformanceCard({
@@ -21,9 +21,8 @@ export function DatasetPerformanceCard({
   providers,
   totalDocuments,
   totalRuns,
+  embedded = false,
 }: DatasetPerformanceCardProps) {
-  const router = useRouter();
-
   // Get all unique metric names and reorder (Duration Seconds last)
   const allMetrics = Array.from(
     new Set(
@@ -92,23 +91,20 @@ export function DatasetPerformanceCard({
     maxScore + padding,
   ] as const;
 
-  // Handle row click to navigate to provider detail
-  const handleProviderClick = (provider: string) => {
-    router.push(`/datasets/${datasetName}/providers/${provider}`);
-  };
-
-  return (
-    <Card>
-      <CardHeader>
-        <div className="flex items-center gap-2">
-          <TrendingUp className="h-5 w-5 text-primary" />
-          <CardTitle>Provider Performance History</CardTitle>
-        </div>
-        <CardDescription>
-          Aggregated across {totalDocuments} documents from {totalRuns} benchmark runs
-        </CardDescription>
-      </CardHeader>
-      <CardContent>
+  const content = (
+    <>
+      {!embedded && (
+        <CardHeader>
+          <div className="flex items-center gap-2">
+            <TrendingUp className="h-5 w-5 text-primary" />
+            <CardTitle>Provider Performance History</CardTitle>
+          </div>
+          <CardDescription>
+            Aggregated across {totalDocuments} documents from {totalRuns} benchmark runs
+          </CardDescription>
+        </CardHeader>
+      )}
+      <CardContent className={embedded ? 'px-0' : ''}>
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
           {/* Left: Metrics Table */}
           <div>
@@ -134,11 +130,7 @@ export function DatasetPerformanceCard({
                     </thead>
                     <tbody>
                       {sortedProviders.map((provider) => (
-                        <tr
-                          key={provider.provider}
-                          className="border-b last:border-0 hover:bg-muted/50 cursor-pointer transition-colors"
-                          onClick={() => handleProviderClick(provider.provider)}
-                        >
+                        <tr key={provider.provider} className="border-b last:border-0">
                           <td className="px-3 py-2 font-medium sticky left-0 bg-background">
                             {provider.provider}
                           </td>
@@ -223,7 +215,7 @@ export function DatasetPerformanceCard({
             {metricNames.length > 0 && (
               <div className="mt-4">
                 <p className="text-xs text-muted-foreground mb-2">
-                  Select metric to compare (click provider for details):
+                  Select metric to compare:
                 </p>
                 <div className="flex flex-wrap gap-2">
                   {metricNames.map((metric) => (
@@ -231,7 +223,11 @@ export function DatasetPerformanceCard({
                       key={metric}
                       size="sm"
                       variant={selectedMetric === metric ? 'default' : 'outline'}
-                      onClick={() => setSelectedMetric(metric)}
+                      onClick={(e) => {
+                        e.preventDefault();
+                        e.stopPropagation();
+                        setSelectedMetric(metric);
+                      }}
                       className="text-xs"
                     >
                       {formatMetricName(metric)}
@@ -243,8 +239,10 @@ export function DatasetPerformanceCard({
           </div>
         </div>
       </CardContent>
-    </Card>
+    </>
   );
+
+  return embedded ? content : <Card>{content}</Card>;
 }
 
 /**

@@ -215,6 +215,139 @@ async def list_datasets():
     return datasets
 
 
+@router.get("/datasets/{dataset_name}/documents", response_model=RunDetail)
+async def get_dataset_documents(dataset_name: str, db=Depends(get_db)):
+    """
+    Get all documents and Q&A results for a dataset across all runs.
+
+    This endpoint aggregates document-level results across ALL completed runs:
+    - For each (document, provider) pair, uses the LATEST successful run's result
+    - Includes all question results (Q&A) for each provider-document combination
+    - Returns structure identical to RunDetail for component reuse
+
+    Path parameters:
+    - dataset_name: Dataset identifier (e.g., 'qasper', 'squad2')
+
+    Returns:
+    Document-level breakdown with provider Q&A results, similar to run details.
+    """
+    # First, get the latest ProviderResult IDs per (document, provider) using raw SQL
+    # This is more efficient than fetching all and filtering in Python
+    latest_pr_ids_query = """
+    WITH latest_results AS (
+        SELECT DISTINCT ON (pr.document_id, pr.provider)
+            pr.id as provider_result_id
+        FROM provider_results pr
+        JOIN benchmark_runs br ON pr.run_id = br.id
+        WHERE br.dataset_name = $1
+          AND br.status = 'COMPLETED'
+          AND pr.status = 'SUCCESS'
+        ORDER BY pr.document_id, pr.provider, br.completed_at DESC NULLS LAST, pr.created_at DESC
+    )
+    SELECT provider_result_id FROM latest_results;
+    """
+
+    latest_pr_ids_raw = await prisma.query_raw(latest_pr_ids_query, dataset_name)
+
+    if not latest_pr_ids_raw:
+        # No results found for this dataset
+        raise HTTPException(
+            status_code=404,
+            detail=f"No completed benchmark results found for dataset '{dataset_name}'"
+        )
+
+    # Extract IDs
+    provider_result_ids = [row["provider_result_id"] for row in latest_pr_ids_raw]
+
+    # Now fetch the full ProviderResult objects with all related data
+    provider_results = await prisma.providerresult.find_many(
+        where={"id": {"in": provider_result_ids}},
+        include={
+            "document": True,
+            "questionResults": {"include": {"question": True}},
+        },
+    )
+
+    if not provider_results:
+        raise HTTPException(
+            status_code=404,
+            detail=f"No results found for dataset '{dataset_name}'"
+        )
+
+    # Group results by document (same logic as run details)
+    docs_map = {}
+    all_providers = set()
+
+    for pr in provider_results:
+        doc = pr.document
+        doc_id = doc.docId
+        all_providers.add(pr.provider)
+
+        # Create document entry if not exists
+        if doc_id not in docs_map:
+            docs_map[doc_id] = {
+                "doc_id": doc_id,
+                "doc_title": doc.docTitle,
+                "providers": {},
+            }
+
+        # Build question results
+        question_results = [
+            QuestionResult(
+                question_id=qr.question.questionId,
+                question=qr.question.question,
+                ground_truth=qr.question.groundTruth,
+                response_answer=qr.responseAnswer,
+                response_context=qr.responseContext,
+                response_latency_ms=qr.responseLatencyMs,
+                evaluation_scores=qr.evaluationScores,
+            )
+            for qr in pr.questionResults
+        ]
+
+        # Add provider result
+        docs_map[doc_id]["providers"][pr.provider] = ProviderResult(
+            provider=pr.provider,
+            status=pr.status.lower(),
+            error=pr.error,
+            aggregated_scores=pr.aggregatedScores,
+            duration_seconds=pr.durationSeconds,
+            questions=question_results,
+        )
+
+    # Convert to DocumentResult list
+    documents = [
+        DocumentResult(
+            doc_id=doc_data["doc_id"],
+            doc_title=doc_data["doc_title"],
+            providers=doc_data["providers"],
+        )
+        for doc_data in docs_map.values()
+    ]
+
+    # Build response (reusing RunDetail structure for component compatibility)
+    return RunDetail(
+        run_id=f"dataset_{dataset_name}",  # Synthetic run_id for consistency
+        dataset=dataset_name,
+        split="all",  # Aggregated across all splits
+        providers=sorted(list(all_providers)),
+        status="completed",
+        num_docs=len(documents),
+        num_questions=sum(
+            len(qr)
+            for doc in documents
+            for pr in doc.providers.values()
+            for qr in [pr.questions]
+        ),
+        config={},  # No specific config for aggregated view
+        started_at=None,  # Not applicable for aggregated view
+        completed_at=None,
+        duration_seconds=None,
+        error_message=None,
+        documents=documents,
+    )
+
+
 @router.get("/datasets/{dataset_name}/performance", response_model=DatasetPerformanceSummary)
 async def get_dataset_performance(dataset_name: str, db=Depends(get_db)):
     """
