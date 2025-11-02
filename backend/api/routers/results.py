@@ -366,7 +366,9 @@ async def get_dataset_performance(dataset_name: str, db=Depends(get_db)):
     """
     # Use raw SQL to efficiently get latest SUCCESS ProviderResult per (documentId, provider) pair
     # Only include successful results - failed results are excluded from aggregation
-    query = """
+    # Note: Using format() instead of parameterized query to avoid prepared statement cache issues
+    # in production with connection pooling
+    query = f"""
     WITH latest_results AS (
         SELECT DISTINCT ON (pr.document_id, pr.provider)
             pr.id,
@@ -380,7 +382,7 @@ async def get_dataset_performance(dataset_name: str, db=Depends(get_db)):
             br.completed_at
         FROM provider_results pr
         JOIN benchmark_runs br ON pr.run_id = br.id
-        WHERE br.dataset_name = $1
+        WHERE br.dataset_name = '{dataset_name.replace("'", "''")}'
           AND br.status = 'COMPLETED'
           AND pr.status = 'SUCCESS'
         ORDER BY pr.document_id, pr.provider, br.completed_at DESC NULLS LAST, pr.created_at DESC
@@ -389,7 +391,7 @@ async def get_dataset_performance(dataset_name: str, db=Depends(get_db)):
     ORDER BY provider, document_id;
     """
 
-    results = await prisma.query_raw(query, dataset_name)
+    results = await prisma.query_raw(query)
 
     if not results:
         # Return empty summary if no results found
