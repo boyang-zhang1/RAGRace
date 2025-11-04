@@ -122,34 +122,14 @@ class ReductoParser(BaseParseAdapter):
 
     def _map_chunks_to_pages(self, chunks: List[Dict[str, Any]]) -> List[PageResult]:
         """
-        Map Reducto chunks to pages using block metadata.
-
-        Reducto chunks don't natively have page numbers, but the blocks
-        within each chunk contain page information. We use this to group
-        chunks by page.
+        Map Reducto chunks to pages using block metadata and construct proper markdown.
 
         Args:
             chunks: List of chunks from Reducto API
 
         Returns:
-            List of PageResult objects, one per page
+            List of PageResult objects with proper markdown from blocks
         """
-        import json
-        from pathlib import Path
-
-        # Debug: Save raw chunks for inspection
-        debug_file = Path("/Users/zby/data/RAGRace/data/temp/reducto_debug.json")
-        try:
-            with open(debug_file, 'w') as f:
-                json.dump({
-                    "total_chunks": len(chunks),
-                    "first_chunk_keys": list(chunks[0].keys()) if chunks else [],
-                    "first_chunk_sample": chunks[0] if chunks else None,
-                    "chunks_preview": chunks[:2] if len(chunks) >= 2 else chunks
-                }, f, indent=2, default=str)
-        except Exception as e:
-            print(f"Debug save failed: {e}")
-
         page_map: Dict[int, List[str]] = defaultdict(list)
         page_images: Dict[int, List[str]] = defaultdict(list)
         max_page = 0
@@ -157,34 +137,18 @@ class ReductoParser(BaseParseAdapter):
         for chunk in chunks:
             # Convert Pydantic object to dict if needed
             if hasattr(chunk, '__dict__'):
-                chunk_dict = chunk.__dict__ if hasattr(chunk, '__dict__') else {}
+                chunk_dict = chunk.__dict__
             elif isinstance(chunk, dict):
                 chunk_dict = chunk
             else:
                 continue
 
-            # Get content (prefer enriched, fallback to embed, then content)
-            content = (
-                chunk_dict.get("enriched")
-                or chunk_dict.get("embed")
-                or chunk_dict.get("content")
-                or ""
-            )
-
-            if not content:
-                continue
-
-            # Extract page numbers from blocks
+            # Extract blocks - this is where the real structured content is
             blocks = chunk_dict.get("blocks", [])
             if not blocks:
-                # If no blocks, try to use chunk-level metadata
-                chunk_page = chunk_dict.get("page", 1)
-                page_map[chunk_page].append(content)
-                max_page = max(max_page, chunk_page)
                 continue
 
-            # Get page numbers from all blocks in this chunk
-            chunk_pages = set()
+            # Process each block to build markdown
             for block in blocks:
                 # Convert block to dict if it's a Pydantic object
                 if hasattr(block, '__dict__'):
@@ -194,45 +158,51 @@ class ReductoParser(BaseParseAdapter):
                 else:
                     continue
 
-                # Try different possible page number fields
-                # First check bbox which should have page number
+                # Get block type and content
+                block_type = block_dict.get("type", "Text")
+                content = block_dict.get("content", "")
+
+                if not content or not content.strip():
+                    continue
+
+                # Get page number from bbox
                 bbox = block_dict.get("bbox", {})
                 if hasattr(bbox, '__dict__'):
                     bbox = bbox.__dict__
-                page_num = bbox.get("page") if isinstance(bbox, dict) else None
+                page_num = bbox.get("page", 1) if isinstance(bbox, dict) else 1
 
-                if page_num is None:
-                    page_num = block_dict.get("page") or block_dict.get("page_number") or block_dict.get("page_idx")
+                # Skip footer blocks
+                if block_type == "Footer":
+                    continue
 
-                if page_num is not None and page_num >= 0:  # Reducto uses -1 for special blocks
-                    # Convert to int if string
-                    if isinstance(page_num, str):
-                        try:
-                            page_num = int(page_num)
-                        except ValueError:
-                            continue
+                # Format content based on block type
+                if block_type == "Section Header":
+                    formatted = f"## {content}\n\n"
+                elif block_type == "Table":
+                    # Table content already in markdown format
+                    formatted = f"{content}\n\n"
+                elif block_type == "List Item":
+                    formatted = f"{content}\n\n"
+                elif block_type == "Text":
+                    formatted = f"{content}\n\n"
+                else:
+                    # Unknown type, treat as text
+                    formatted = f"{content}\n\n"
 
-                    chunk_pages.add(page_num)
+                # Add to page map
+                if page_num > 0:  # Ignore negative page numbers
+                    page_map[page_num].append(formatted)
                     max_page = max(max_page, page_num)
 
                 # Extract image URLs if available
-                block_type = block_dict.get("type") or block_dict.get("block_type")
                 if block_type == "Image":
-                    image_url = block_dict.get("url") or block_dict.get("image_url")
-                    if image_url and page_num and page_num >= 0:
+                    image_url = block_dict.get("image_url") or block_dict.get("url")
+                    if image_url:
                         page_images[page_num].append(image_url)
-
-            # If chunk spans multiple pages, add to all of them
-            # If no page info, add to page 1
-            if not chunk_pages:
-                chunk_pages.add(1)
-
-            for page_num in chunk_pages:
-                page_map[page_num].append(content)
 
         # Ensure we have at least one page
         if not page_map:
-            page_map[1] = ["*No content extracted - check Reducto API response format*"]
+            page_map[1] = ["*No content extracted from blocks*"]
             max_page = 1
         else:
             max_page = max(max_page, 1)
@@ -240,16 +210,16 @@ class ReductoParser(BaseParseAdapter):
         # Convert to PageResult objects
         pages = []
         for page_num in range(1, max_page + 1):
-            page_content = page_map.get(page_num, [])
-            markdown = "\n\n".join(page_content) if page_content else "*No content on this page*"
+            page_blocks = page_map.get(page_num, [])
+            markdown = "".join(page_blocks) if page_blocks else "*No content on this page*"
 
             pages.append(
                 PageResult(
                     page_number=page_num,
-                    markdown=markdown,
+                    markdown=markdown.strip(),
                     images=page_images.get(page_num, []),
                     metadata={
-                        "chunk_count": len(page_content),
+                        "block_count": len(page_blocks),
                         "has_images": len(page_images.get(page_num, [])) > 0,
                     },
                 )
