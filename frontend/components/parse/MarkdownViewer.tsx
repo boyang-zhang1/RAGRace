@@ -46,10 +46,31 @@ export function MarkdownViewer({
                 table: ({ node, ...props }) => (
                   <div className="overflow-x-auto my-4">
                     <table
-                      className="min-w-full divide-y divide-gray-300 border"
+                      className="min-w-full border-collapse border border-gray-400"
                       {...props}
                     />
                   </div>
+                ),
+                thead: ({ node, ...props }) => (
+                  <thead className="bg-gray-100 dark:bg-gray-800" {...props} />
+                ),
+                tbody: ({ node, ...props }) => (
+                  <tbody className="divide-y divide-gray-300" {...props} />
+                ),
+                tr: ({ node, ...props }) => (
+                  <tr className="border-b border-gray-300" {...props} />
+                ),
+                th: ({ node, ...props }) => (
+                  <th
+                    className="border border-gray-400 px-4 py-2 text-left font-semibold bg-gray-100 dark:bg-gray-800"
+                    {...props}
+                  />
+                ),
+                td: ({ node, ...props }) => (
+                  <td
+                    className="border border-gray-300 px-4 py-2"
+                    {...props}
+                  />
                 ),
                 // Custom code block styling
                 code: ({ node, inline, ...props }) =>
