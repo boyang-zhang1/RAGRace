@@ -43,11 +43,14 @@ pypdf>=3.0.0
 playwright>=1.40.0  # HTML to PDF conversion (preserves document structure)
 
 # Add more providers as needed
-# landing-ai
+# Parsing providers
+reductoai>=0.13.0
+landingai-ade>=0.20.2
 
 # Web API
 fastapi==0.104.1
 uvicorn[standard]==0.24.0
+python-multipart>=0.0.20  # Required for file uploads
 
 # Database ORM
 prisma==0.11.0

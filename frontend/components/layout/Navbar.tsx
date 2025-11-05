@@ -18,6 +18,11 @@ export function Navbar() {
       isActive: pathname?.startsWith('/results'),
     },
     {
+      href: '/parse',
+      label: 'Parse & Compare',
+      isActive: pathname?.startsWith('/parse'),
+    },
+    {
       href: '/dashboard',
       label: 'Run Benchmark',
       isActive: pathname?.startsWith('/dashboard'),

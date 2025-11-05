@@ -74,7 +74,7 @@ export default function DashboardPage() {
               <li>Configure the number of documents and questions</li>
               <li>Provide your API key for authentication</li>
               <li>Submit to start the benchmark execution</li>
-              <li>You'll be redirected to the results page when complete</li>
+              <li>You’ll be redirected to the results page when complete</li>
             </ul>
           </AlertDescription>
         </Alert>

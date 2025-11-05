@@ -5,6 +5,7 @@ import { apiClient } from '@/lib/api-client';
 import { RunDetails } from '@/components/results/RunDetails';
 import { OverallResultsCard } from '@/components/results/OverallResultsCard';
 import { Badge } from '@/components/ui/badge';
+import { ProviderLabel } from '@/components/providers/ProviderLabel';
 import { Card, CardContent } from '@/components/ui/card';
 import { Skeleton } from '@/components/ui/skeleton';
 import { ArrowLeft } from 'lucide-react';
@@ -14,99 +15,31 @@ interface PageProps {
 }
 
 async function DatasetDetailContent({ datasetName }: { datasetName: string }) {
-  try {
-    const data = await apiClient.getDatasetDocuments(datasetName);
+  let data: Awaited<ReturnType<typeof apiClient.getDatasetDocuments>> | null = null;
+  let displayName = datasetName.toUpperCase();
+  let fetchError: unknown = null;
 
-    // Get dataset display name
+  try {
+    data = await apiClient.getDatasetDocuments(datasetName);
     const datasets = await apiClient.getDatasets();
     const datasetInfo = datasets.find((d) => d.name === datasetName);
-    const displayName = datasetInfo?.display_name || datasetName.toUpperCase();
-
-    return (
-      <div className="space-y-6">
-        {/* Back Link */}
-        <Link
-          href="/datasets"
-          className="inline-flex items-center text-sm text-muted-foreground hover:text-primary"
-        >
-          <ArrowLeft className="mr-2 h-4 w-4" />
-          Back to Datasets
-        </Link>
-
-        {/* Dataset Header */}
-        <div>
-          <h1 className="text-3xl font-bold tracking-tight">{displayName}</h1>
-          <p className="text-muted-foreground mt-2">
-            Aggregated results across all benchmark runs
-          </p>
-        </div>
-
-        {/* Dataset Metadata Card */}
-        <Card>
-          <CardContent className="pt-6">
-            <div className="grid grid-cols-2 md:grid-cols-4 gap-6">
-              <div>
-                <p className="text-sm font-medium text-muted-foreground">Dataset</p>
-                <p className="text-lg font-semibold mt-1">{datasetName}</p>
-              </div>
-
-              <div>
-                <p className="text-sm font-medium text-muted-foreground">Aggregation Scope</p>
-                <div className="mt-1">
-                  <Badge variant="outline">All Splits</Badge>
-                </div>
-              </div>
-
-              <div>
-                <p className="text-sm font-medium text-muted-foreground">Documents</p>
-                <p className="text-lg font-semibold mt-1">{data.num_docs}</p>
-              </div>
-
-              <div>
-                <p className="text-sm font-medium text-muted-foreground">Questions</p>
-                <p className="text-lg font-semibold mt-1">{data.num_questions}</p>
-              </div>
-
-              <div className="col-span-2">
-                <p className="text-sm font-medium text-muted-foreground">Providers Tested</p>
-                <div className="flex flex-wrap gap-2 mt-1">
-                  {data.providers.map((provider) => (
-                    <Badge key={provider} variant="outline">
-                      {provider}
-                    </Badge>
-                  ))}
-                </div>
-              </div>
-            </div>
-          </CardContent>
-        </Card>
-
-        {/* Overall Results */}
-        {data.documents.length > 0 && (
-          <OverallResultsCard documents={data.documents} providers={data.providers} />
-        )}
-
-        {/* Document Results */}
-        <div>
-          <h2 className="text-2xl font-bold mb-4">Document Results</h2>
-          <p className="text-sm text-muted-foreground mb-4">
-            Showing latest successful results for each provider per document
-          </p>
-          <RunDetails documents={data.documents} providers={data.providers} />
-        </div>
-      </div>
-    );
+    if (datasetInfo?.display_name) {
+      displayName = datasetInfo.display_name;
+    }
   } catch (error) {
     if (error instanceof Error && error.message.includes('404')) {
       notFound();
     }
+    fetchError = error;
+  }
+
+  if (!data) {
+    const message = fetchError instanceof Error ? fetchError.message : 'Failed to load dataset details';
 
     return (
       <div className="text-center py-12">
         <h2 className="text-2xl font-bold text-destructive mb-2">Error Loading Dataset Details</h2>
-        <p className="text-muted-foreground">
-          {error instanceof Error ? error.message : 'Failed to load dataset details'}
-        </p>
+        <p className="text-muted-foreground">{message}</p>
         <Link
           href="/datasets"
           className="inline-flex items-center text-sm text-primary hover:underline mt-4"
@@ -117,6 +50,85 @@ async function DatasetDetailContent({ datasetName }: { datasetName: string }) {
       </div>
     );
   }
+
+  return (
+    <div className="space-y-6">
+      {/* Back Link */}
+      <Link
+        href="/datasets"
+        className="inline-flex items-center text-sm text-muted-foreground hover:text-primary"
+      >
+        <ArrowLeft className="mr-2 h-4 w-4" />
+        Back to Datasets
+      </Link>
+
+      {/* Dataset Header */}
+      <div>
+        <h1 className="text-3xl font-bold tracking-tight">{displayName}</h1>
+        <p className="text-muted-foreground mt-2">
+          Aggregated results across all benchmark runs
+        </p>
+      </div>
+
+      {/* Dataset Metadata Card */}
+      <Card>
+        <CardContent className="pt-6">
+          <div className="grid grid-cols-2 md:grid-cols-4 gap-6">
+            <div>
+              <p className="text-sm font-medium text-muted-foreground">Dataset</p>
+              <p className="text-lg font-semibold mt-1">{datasetName}</p>
+            </div>
+
+            <div>
+              <p className="text-sm font-medium text-muted-foreground">Aggregation Scope</p>
+              <div className="mt-1">
+                <Badge variant="outline">All Splits</Badge>
+              </div>
+            </div>
+
+            <div>
+              <p className="text-sm font-medium text-muted-foreground">Documents</p>
+              <p className="text-lg font-semibold mt-1">{data.num_docs}</p>
+            </div>
+
+            <div>
+              <p className="text-sm font-medium text-muted-foreground">Questions</p>
+              <p className="text-lg font-semibold mt-1">{data.num_questions}</p>
+            </div>
+
+            <div className="col-span-2">
+              <p className="text-sm font-medium text-muted-foreground">Providers Tested</p>
+              <div className="flex flex-wrap gap-2 mt-1">
+                {data.providers.map((provider) => (
+                  <Badge key={provider} variant="outline" className="gap-1.5">
+                    <ProviderLabel
+                      provider={provider}
+                      size={16}
+                      nameClassName="text-xs font-semibold"
+                    />
+                  </Badge>
+                ))}
+              </div>
+            </div>
+          </div>
+        </CardContent>
+      </Card>
+
+      {/* Overall Results */}
+      {data.documents.length > 0 && (
+        <OverallResultsCard documents={data.documents} providers={data.providers} />
+      )}
+
+      {/* Document Results */}
+      <div>
+        <h2 className="text-2xl font-bold mb-4">Document Results</h2>
+        <p className="text-sm text-muted-foreground mb-4">
+          Showing latest successful results for each provider per document
+        </p>
+        <RunDetails documents={data.documents} providers={data.providers} />
+      </div>
+    </div>
+  );
 }
 
 function DatasetDetailLoading() {

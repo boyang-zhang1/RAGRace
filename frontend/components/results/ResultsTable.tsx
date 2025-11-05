@@ -12,6 +12,7 @@ import {
   TableRow,
 } from '@/components/ui/table';
 import { Badge } from '@/components/ui/badge';
+import { ProviderLabel } from '@/components/providers/ProviderLabel';
 import type { RunSummary } from '@/types/api';
 
 interface ResultsTableProps {
@@ -97,8 +98,12 @@ export function ResultsTable({ runs }: ResultsTableProps) {
               <TableCell>
                 <div className="flex flex-wrap gap-1">
                   {run.providers.map((provider) => (
-                    <Badge key={provider} variant="outline">
-                      {provider}
+                    <Badge key={provider} variant="outline" className="gap-1.5">
+                      <ProviderLabel
+                        provider={provider}
+                        size={14}
+                        nameClassName="text-xs font-semibold"
+                      />
                     </Badge>
                   ))}
                 </div>

@@ -24,6 +24,7 @@ import { Checkbox } from '@/components/ui/checkbox';
 import { Slider } from '@/components/ui/slider';
 import { Alert, AlertDescription } from '@/components/ui/alert';
 import { AlertCircle } from 'lucide-react';
+import { ProviderLabel } from '@/components/providers/ProviderLabel';
 
 // Available options
 const DATASETS = [
@@ -190,7 +191,12 @@ export function BenchmarkForm({ onSubmitStart, onSubmitEnd }: BenchmarkFormProps
                   htmlFor={provider.value}
                   className="text-sm font-medium leading-none peer-disabled:cursor-not-allowed peer-disabled:opacity-70"
                 >
-                  {provider.label}
+                  <ProviderLabel
+                    provider={provider.value}
+                    size={18}
+                    className="gap-2"
+                    nameClassName="text-sm font-medium"
+                  />
                 </label>
                 <p className="text-sm text-muted-foreground">
                   {provider.description}

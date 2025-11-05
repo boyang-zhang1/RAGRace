@@ -3,6 +3,7 @@
 import { useState } from 'react';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
+import { ProviderLabel } from '@/components/providers/ProviderLabel';
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '@/components/ui/collapsible';
 import { ChevronDown, ChevronRight } from 'lucide-react';
 import type { DocumentResult, ProviderResult } from '@/types/api';
@@ -56,7 +57,9 @@ function DocumentCard({ document, providers }: { document: DocumentResult; provi
 
                   return (
                     <tr key={providerName} className="border-b last:border-0">
-                      <td className="px-4 py-2 font-medium">{providerName}</td>
+                      <td className="px-4 py-2 font-medium">
+                        <ProviderLabel provider={providerName} size={18} />
+                      </td>
                       <td className="px-4 py-2">
                         <Badge variant={result.status === 'success' ? 'default' : 'destructive'}>
                           {result.status}
@@ -131,7 +134,13 @@ function QuestionsView({ document, providers }: { document: DocumentResult; prov
                 return (
                   <div key={providerName} className="border rounded-lg p-3">
                     <div className="flex items-center justify-between mb-2">
-                      <Badge variant="outline">{providerName}</Badge>
+                      <Badge variant="outline" className="gap-1.5">
+                        <ProviderLabel
+                          provider={providerName}
+                          size={14}
+                          nameClassName="text-xs font-semibold"
+                        />
+                      </Badge>
                       <div className="flex gap-2">
                         {answer.response_latency_ms && (
                           <span className="text-xs text-muted-foreground">

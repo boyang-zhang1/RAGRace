@@ -1,0 +1,39 @@
+# Pricing configuration for PDF parsing providers
+# This file maps provider configurations to credit costs and USD pricing
+
+llamaindex:
+  # LlamaIndex pricing: 1 USD = 1000 credits
+  usd_per_credit: 0.001
+
+  # Model-specific pricing based on parse_mode and model combination
+  models:
+    # parse_page_with_agent mode
+    - parse_mode: "parse_page_with_agent"
+      model: "openai-gpt-4-1-mini"
+      credits_per_page: 20
+      description: "GPT-4 mini agent parsing"
+
+    - parse_mode: "parse_page_with_agent"
+      model: "anthropic-sonnet-4.0"
+      credits_per_page: 90
+      description: "Sonnet 4.0 agent parsing"
+
+    # Add more model configurations as they become available
+    - parse_mode: "parse_page_with_llm"
+      credits_per_page: 3
+      description: "LLM parsing"
+
+reducto:
+  # Reducto pricing: 0.015 USD per credit
+  usd_per_credit: 0.015
+  credits_per_page: 1
+
+  # Credits are returned in API response under usage.credits
+  # No need for per-page calculation
+
+landingai:
+  # LandingAI pricing: 0.01 USD per credit
+  usd_per_credit: 0.01
+
+  # Fixed rate: 3 credits per page
+  credits_per_page: 3

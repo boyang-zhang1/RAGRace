@@ -3,6 +3,7 @@
 import { useState } from 'react';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
+import { ProviderLabel } from '@/components/providers/ProviderLabel';
 import {
   calculateOverallScores,
   sortProvidersByMetric,
@@ -11,6 +12,7 @@ import {
   type ProviderOverallScores,
 } from '@/lib/aggregateScores';
 import type { DocumentResult } from '@/types/api';
+import { getProviderDisplayName } from '@/lib/providerMetadata';
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer } from 'recharts';
 import type { AxisDomain } from 'recharts/types/util/types';
 import { TrendingUp } from 'lucide-react';
@@ -60,7 +62,7 @@ export function OverallResultsCard({ documents, providers }: OverallResultsCardP
 
   // Prepare chart data for selected metric
   const chartData = sortedByMetric.map(p => ({
-    provider: p.provider,
+    provider: getProviderDisplayName(p.provider),
     score: p.averageScores[selectedMetric] ?? 0,
   }));
 
@@ -110,7 +112,7 @@ export function OverallResultsCard({ documents, providers }: OverallResultsCardP
                   {sortedByMetric.map(result => (
                     <tr key={result.provider} className="border-b last:border-0">
                       <td className="px-3 py-2 font-medium sticky left-0 bg-background">
-                        {result.provider}
+                        <ProviderLabel provider={result.provider} />
                       </td>
                       {metricNames.map(metric => {
                         const value = result.averageScores[metric];

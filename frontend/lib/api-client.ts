@@ -150,6 +150,89 @@ class ApiClient {
   }
 
   /**
+   * Upload a PDF file for parsing
+   *
+   * @param file PDF file to upload
+   * @returns Upload response with file_id and filename
+   */
+  async uploadPdf(file: File): Promise<{ file_id: string; filename: string }> {
+    const formData = new FormData();
+    formData.append('file', file);
+
+    const response = await fetch(`${this.baseUrl}/api/v1/parse/upload`, {
+      method: 'POST',
+      body: formData, // Don't set Content-Type header - browser will set it with boundary
+    });
+
+    if (!response.ok) {
+      const errorData = await response.json();
+      throw new Error(errorData.detail || 'Upload failed');
+    }
+
+    return await response.json();
+  }
+
+  /**
+   * Compare PDF parsing across multiple providers
+   *
+   * @param fileId UUID of uploaded file
+   * @param apiKeys API keys for each provider
+   * @returns Parse results from each provider
+   */
+  async compareParses(
+    fileId: string,
+    apiKeys: Record<string, string>
+  ): Promise<{
+    file_id: string;
+    results: Record<string, {
+      total_pages: number;
+      pages: Array<{
+        page_number: number;
+        markdown: string;
+        images: string[];
+        metadata: Record<string, any>;
+      }>;
+      processing_time: number;
+      usage: Record<string, any>;
+    }>;
+  }> {
+    // Determine providers from api_keys
+    const providers = Object.keys(apiKeys);
+
+    return this.fetchWithError('/api/v1/parse/compare', {
+      method: 'POST',
+      body: JSON.stringify({
+        file_id: fileId,
+        providers,
+        api_keys: apiKeys,
+      }),
+    });
+  }
+
+  /**
+   * Calculate costs for parse results
+   *
+   * @param parseResults Parse results from compareParses
+   * @returns Cost breakdown for each provider
+   */
+  async calculateParseCost(parseResults: any): Promise<{
+    file_id: string;
+    costs: Record<string, {
+      provider: string;
+      credits: number;
+      usd_per_credit: number;
+      total_usd: number;
+      details: Record<string, any>;
+    }>;
+    total_usd: number;
+  }> {
+    return this.fetchWithError('/api/v1/parse/calculate-cost', {
+      method: 'POST',
+      body: JSON.stringify(parseResults),
+    });
+  }
+
+  /**
    * Create and execute a new benchmark run
    *
    * @param request Benchmark configuration (includes api_keys for providers)

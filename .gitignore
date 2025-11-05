@@ -61,6 +61,7 @@ data/cache/
 data/results/
 *sanitized_policies/
 *original_policies/
+data/temp/
 
 # But KEEP metadata and small test files
 !data/datasets/**/dataset.yaml

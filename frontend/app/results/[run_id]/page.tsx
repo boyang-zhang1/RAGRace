@@ -6,6 +6,7 @@ import { apiClient } from '@/lib/api-client';
 import { RunDetails } from '@/components/results/RunDetails';
 import { OverallResultsCard } from '@/components/results/OverallResultsCard';
 import { Badge } from '@/components/ui/badge';
+import { ProviderLabel } from '@/components/providers/ProviderLabel';
 import { Card, CardContent } from '@/components/ui/card';
 import { Skeleton } from '@/components/ui/skeleton';
 import { ArrowLeft } from 'lucide-react';
@@ -14,25 +15,45 @@ interface PageProps {
   params: Promise<{ run_id: string }>;
 }
 
-async function RunDetailContent({ runId }: { runId: string }) {
-  try {
-    const run = await apiClient.getRunDetail(runId);
+function getStatusBadgeVariant(status: string) {
+  switch (status) {
+    case 'completed':
+      return 'default';
+    case 'running':
+      return 'secondary';
+    case 'failed':
+      return 'destructive';
+    default:
+      return 'outline';
+  }
+}
 
-    const getStatusBadgeVariant = (status: string) => {
-      switch (status) {
-        case 'completed':
-          return 'default';
-        case 'running':
-          return 'secondary';
-        case 'failed':
-          return 'destructive';
-        default:
-          return 'outline';
-      }
-    };
+async function RunDetailContent({ runId }: { runId: string }) {
+  let run: Awaited<ReturnType<typeof apiClient.getRunDetail>> | null = null;
+  let fetchError: unknown = null;
+
+  try {
+    run = await apiClient.getRunDetail(runId);
+  } catch (error) {
+    if (error instanceof Error && error.message.includes('404')) {
+      notFound();
+    }
+    fetchError = error;
+  }
+
+  if (!run) {
+    const message = fetchError instanceof Error ? fetchError.message : 'Failed to load run details';
 
     return (
-      <div className="space-y-6">
+      <div className="text-center py-12">
+        <h2 className="text-2xl font-bold text-destructive mb-2">Error Loading Run Details</h2>
+        <p className="text-muted-foreground">{message}</p>
+      </div>
+    );
+  }
+
+  return (
+    <div className="space-y-6">
         {/* Back Link */}
         <Link
           href="/results"
@@ -97,8 +118,12 @@ async function RunDetailContent({ runId }: { runId: string }) {
                 <p className="text-sm font-medium text-muted-foreground">Providers</p>
                 <div className="flex flex-wrap gap-2 mt-1">
                   {run.providers.map((provider) => (
-                    <Badge key={provider} variant="outline">
-                      {provider}
+                    <Badge key={provider} variant="outline" className="gap-1.5">
+                      <ProviderLabel
+                        provider={provider}
+                        size={16}
+                        nameClassName="text-xs font-semibold"
+                      />
                     </Badge>
                   ))}
                 </div>
@@ -125,21 +150,7 @@ async function RunDetailContent({ runId }: { runId: string }) {
           <RunDetails documents={run.documents} providers={run.providers} />
         </div>
       </div>
-    );
-  } catch (error) {
-    if (error instanceof Error && error.message.includes('404')) {
-      notFound();
-    }
-
-    return (
-      <div className="text-center py-12">
-        <h2 className="text-2xl font-bold text-destructive mb-2">Error Loading Run Details</h2>
-        <p className="text-muted-foreground">
-          {error instanceof Error ? error.message : 'Failed to load run details'}
-        </p>
-      </div>
-    );
-  }
+  );
 }
 
 function RunDetailLoading() {
