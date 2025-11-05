@@ -20,6 +20,7 @@ from api.models.parsing import (
 )
 from src.adapters.parsing.llamaindex_parser import LlamaIndexParser
 from src.adapters.parsing.reducto_parser import ReductoParser
+from src.adapters.parsing.landingai_parser import LandingAIParser
 
 router = APIRouter(prefix="/parse", tags=["parsing"])
 
@@ -95,6 +96,9 @@ async def compare_parsers(request: ParseCompareRequest):
 
         if "reducto" in request.providers:
             parsers["reducto"] = ReductoParser()
+
+        if "landingai" in request.providers:
+            parsers["landingai"] = LandingAIParser()
 
     except ValueError as e:
         raise HTTPException(

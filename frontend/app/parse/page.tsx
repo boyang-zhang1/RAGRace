@@ -24,6 +24,7 @@ interface ProviderResult {
 interface ParseResults {
   llamaindex?: ProviderResult;
   reducto?: ProviderResult;
+  landingai?: ProviderResult;
 }
 
 export default function ParsePage() {
@@ -82,7 +83,7 @@ export default function ParsePage() {
         },
         body: JSON.stringify({
           file_id: fid,
-          providers: ["llamaindex", "reducto"],
+          providers: ["llamaindex", "reducto", "landingai"],
         }),
       });
 
@@ -98,6 +99,7 @@ export default function ParsePage() {
       const pages =
         data.results.llamaindex?.total_pages ||
         data.results.reducto?.total_pages ||
+        data.results.landingai?.total_pages ||
         0;
       setTotalPages(pages);
       setCurrentPage(1);
@@ -134,12 +136,20 @@ export default function ParsePage() {
     return page?.markdown;
   };
 
+  const getLandingAIMarkdown = () => {
+    if (!parseResults?.landingai) return undefined;
+    const page = parseResults.landingai.pages.find(
+      (p) => p.page_number === currentPage
+    );
+    return page?.markdown;
+  };
+
   return (
     <div className="container mx-auto p-6 max-w-full px-8">
       <div className="mb-6">
         <h1 className="text-3xl font-bold mb-2">PDF Parse & Compare</h1>
         <p className="text-gray-600 dark:text-gray-400">
-          Upload a PDF to compare parsing results from LlamaIndex and Reducto
+          Upload a PDF to compare parsing results from LlamaIndex, Reducto, and LandingAI
         </p>
       </div>
 
@@ -205,8 +215,8 @@ export default function ParsePage() {
                 />
               )}
 
-              {/* Provider Comparison (Lower Section - Two Wide Columns) */}
-              <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
+              {/* Provider Comparison (Lower Section - Three Columns with Responsive Stacking) */}
+              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8">
                 <MarkdownViewer
                   title="LlamaIndex"
                   markdown={getLlamaIndexMarkdown()}
@@ -215,13 +225,18 @@ export default function ParsePage() {
                   title="Reducto"
                   markdown={getReductoMarkdown()}
                 />
+                <MarkdownViewer
+                  title="LandingAI"
+                  markdown={getLandingAIMarkdown()}
+                />
               </div>
 
               {/* Processing Time Info */}
               <div className="text-sm text-gray-500 text-center">
                 Processing times: LlamaIndex{" "}
                 {parseResults.llamaindex?.processing_time.toFixed(2)}s |
-                Reducto {parseResults.reducto?.processing_time.toFixed(2)}s
+                Reducto {parseResults.reducto?.processing_time.toFixed(2)}s |
+                LandingAI {parseResults.landingai?.processing_time.toFixed(2)}s
               </div>
             </>
           ) : null}
