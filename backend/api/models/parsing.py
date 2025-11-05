@@ -24,6 +24,41 @@ class CostComparisonResponse(BaseModel):
     total_usd: float
 
 
+class LlamaIndexConfig(BaseModel):
+    """Configuration for LlamaIndex parsing."""
+
+    parse_mode: str = Field(
+        default="parse_page_with_agent",
+        description="Parse mode: parse_page_with_agent or parse_page_with_llm"
+    )
+    model: str = Field(
+        default="openai-gpt-4-1-mini",
+        description="Model to use for parsing"
+    )
+
+
+class ReductoConfig(BaseModel):
+    """Configuration for Reducto parsing."""
+
+    mode: str = Field(
+        default="standard",
+        description="Mode: standard (1 credit/page) or complex (2 credits/page)"
+    )
+    summarize_figures: bool = Field(
+        default=False,
+        description="Enable VLM enhancement for complex pages"
+    )
+
+
+class LandingAIConfig(BaseModel):
+    """Configuration for LandingAI parsing."""
+
+    model: str = Field(
+        default="dpt-2",
+        description="Model to use (currently only dpt-2 is available)"
+    )
+
+
 class ParseCompareRequest(BaseModel):
     """
     Request model for comparing PDF parsing across providers.
@@ -35,6 +70,10 @@ class ParseCompareRequest(BaseModel):
             "api_keys": {
                 "llamaindex": "llx_...",
                 "reducto": "sk_..."
+            },
+            "configs": {
+                "llamaindex": {"parse_mode": "parse_page_with_agent", "model": "openai-gpt-4-1-mini"},
+                "reducto": {"mode": "standard", "summarize_figures": false}
             }
         }
     """
@@ -47,6 +86,10 @@ class ParseCompareRequest(BaseModel):
     api_keys: Dict[str, str] = Field(
         ..., description="API keys for each provider"
     )
+    configs: Dict[str, Dict[str, Any]] = Field(
+        default={},
+        description="Optional configurations for each provider"
+    )
 
     class Config:
         json_schema_extra = {
@@ -56,9 +99,27 @@ class ParseCompareRequest(BaseModel):
                 "api_keys": {
                     "llamaindex": "llx_...",
                     "reducto": "sk_..."
+                },
+                "configs": {
+                    "llamaindex": {"parse_mode": "parse_page_with_agent", "model": "openai-gpt-4-1-mini"},
+                    "reducto": {"mode": "standard", "summarize_figures": False}
                 }
             }
         }
+
+
+class PageCountRequest(BaseModel):
+    """Request model for getting page count of an uploaded PDF."""
+
+    file_id: str = Field(..., description="UUID of uploaded file")
+
+
+class PageCountResponse(BaseModel):
+    """Response model for page count."""
+
+    file_id: str = Field(..., description="UUID of the file")
+    page_count: int = Field(..., description="Number of pages in the PDF")
+    filename: str = Field(..., description="Original filename")
 
 
 class UploadResponse(BaseModel):
