@@ -72,26 +72,29 @@ class ReductoParser(BaseParseAdapter):
             },
         )
 
-        # Debug: Save raw result structure
+        # Debug: Save raw result structure (optional, only if temp dir exists)
         import json
-        debug_file_raw = Path("/Users/zby/data/RAGRace/data/temp/reducto_raw_result.json")
         try:
-            with open(debug_file_raw, 'w') as f:
-                result_info = {
-                    "result_type": str(type(result)),
-                    "has_result_attr": hasattr(result, 'result'),
-                }
-                if hasattr(result, '__dict__'):
-                    result_info["result_dict_keys"] = list(result.__dict__.keys())
-                if isinstance(result, dict):
-                    result_info["dict_keys"] = list(result.keys())
-                    result_info["result_value"] = result[:500] if len(str(result)) > 500 else result
-                else:
-                    result_info["result_str"] = str(result)[:500]
+            temp_dir = Path("data/temp")
+            if temp_dir.exists():
+                debug_file_raw = temp_dir / "reducto_raw_result.json"
+                with open(debug_file_raw, 'w') as f:
+                    result_info = {
+                        "result_type": str(type(result)),
+                        "has_result_attr": hasattr(result, 'result'),
+                    }
+                    if hasattr(result, '__dict__'):
+                        result_info["result_dict_keys"] = list(result.__dict__.keys())
+                    if isinstance(result, dict):
+                        result_info["dict_keys"] = list(result.keys())
+                        result_info["result_value"] = result[:500] if len(str(result)) > 500 else result
+                    else:
+                        result_info["result_str"] = str(result)[:500]
 
-                json.dump(result_info, f, indent=2, default=str)
+                    json.dump(result_info, f, indent=2, default=str)
         except Exception as e:
-            print(f"Debug raw result save failed: {e}")
+            # Silently ignore debug file errors
+            pass
 
         # Extract chunks from result - handle Reducto ParseResponse object
         if hasattr(result, 'result'):

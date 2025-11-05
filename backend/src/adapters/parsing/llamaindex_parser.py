@@ -58,33 +58,34 @@ class LlamaIndexParser(BaseParseAdapter):
         # Parse the PDF (async)
         result = await parser.aparse(str(pdf_path))
 
-        # Debug: Save the raw result to see its structure
+        # Debug: Save the raw result to see its structure (optional, only if temp dir exists)
         import json
-        debug_file = Path("/Users/zby/data/RAGRace/data/temp/llamaparse_debug.json")
-        debug_file.parent.mkdir(parents=True, exist_ok=True)
-
-        # Try to serialize result for inspection
         try:
-            debug_data = {
-                "type": str(type(result)),
-                "dir": [x for x in dir(result) if not x.startswith('_')],
-                "pages_type": str(type(result.pages)) if hasattr(result, 'pages') else None,
-                "pages_length": len(result.pages) if hasattr(result, 'pages') else None,
-            }
-            if hasattr(result, 'pages') and len(result.pages) > 0:
-                first_page = result.pages[0]
-                debug_data["first_page_type"] = str(type(first_page))
-                debug_data["first_page_dir"] = [x for x in dir(first_page) if not x.startswith('_')]
-                debug_data["first_page_md"] = str(first_page.md) if hasattr(first_page, 'md') else None
-                debug_data["first_page_images_type"] = str(type(first_page.images)) if hasattr(first_page, 'images') else None
-                if hasattr(first_page, 'images') and first_page.images:
-                    debug_data["first_image_type"] = str(type(first_page.images[0]))
-                    debug_data["first_image_dir"] = [x for x in dir(first_page.images[0]) if not x.startswith('_')]
+            temp_dir = Path("data/temp")
+            if temp_dir.exists():
+                debug_file = temp_dir / "llamaparse_debug.json"
+                # Try to serialize result for inspection
+                debug_data = {
+                    "type": str(type(result)),
+                    "dir": [x for x in dir(result) if not x.startswith('_')],
+                    "pages_type": str(type(result.pages)) if hasattr(result, 'pages') else None,
+                    "pages_length": len(result.pages) if hasattr(result, 'pages') else None,
+                }
+                if hasattr(result, 'pages') and len(result.pages) > 0:
+                    first_page = result.pages[0]
+                    debug_data["first_page_type"] = str(type(first_page))
+                    debug_data["first_page_dir"] = [x for x in dir(first_page) if not x.startswith('_')]
+                    debug_data["first_page_md"] = str(first_page.md) if hasattr(first_page, 'md') else None
+                    debug_data["first_page_images_type"] = str(type(first_page.images)) if hasattr(first_page, 'images') else None
+                    if hasattr(first_page, 'images') and first_page.images:
+                        debug_data["first_image_type"] = str(type(first_page.images[0]))
+                        debug_data["first_image_dir"] = [x for x in dir(first_page.images[0]) if not x.startswith('_')]
 
-            with open(debug_file, 'w') as f:
-                json.dump(debug_data, f, indent=2)
+                with open(debug_file, 'w') as f:
+                    json.dump(debug_data, f, indent=2)
         except Exception as e:
-            print(f"Debug serialization failed: {e}")
+            # Silently ignore debug file errors
+            pass
 
         # Extract page-by-page markdown
         pages = []
