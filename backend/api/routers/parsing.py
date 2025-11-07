@@ -11,6 +11,7 @@ from typing import Dict
 
 from fastapi import APIRouter, File, HTTPException, UploadFile
 from fastapi.responses import FileResponse
+from pypdf import PdfReader
 
 from api.models.parsing import (
     ParseCompareRequest,
@@ -20,6 +21,8 @@ from api.models.parsing import (
     PageData,
     ProviderCost,
     CostComparisonResponse,
+    PageCountRequest,
+    PageCountResponse,
 )
 from src.adapters.parsing.llamaindex_parser import LlamaIndexParser
 from src.adapters.parsing.reducto_parser import ReductoParser
@@ -112,22 +115,38 @@ def calculate_provider_cost(provider: str, usage: Dict, pricing_config: Dict) ->
         )
 
     elif provider == "reducto":
-        # Credits directly from API response
-        credits = usage.get("credits", 0)
+        # Get mode from usage to determine credits per page
+        mode = usage.get("mode", "standard")
         num_pages = usage.get("num_pages", 0)
-        total_usd = credits * usd_per_credit
 
-        # Calculate credits per page from actual usage
-        credits_per_page = (credits / num_pages) if num_pages > 0 else 0
+        # Look up credits_per_page from pricing config based on mode
+        models = provider_config.get("models", [])
+        credits_per_page = None
+        for model_config in models:
+            if model_config.get("mode") == mode:
+                credits_per_page = model_config.get("credits_per_page")
+                break
+
+        # Fall back to API response credits if config lookup fails
+        if credits_per_page is None:
+            credits = usage.get("credits", 0)
+            credits_per_page = (credits / num_pages) if num_pages > 0 else 1
+            total_credits = credits
+        else:
+            total_credits = num_pages * credits_per_page
+
+        total_usd = total_credits * usd_per_credit
 
         return ProviderCost(
             provider=provider,
-            credits=credits,
+            credits=total_credits,
             usd_per_credit=usd_per_credit,
             total_usd=total_usd,
             details={
+                "mode": mode,
                 "num_pages": num_pages,
                 "credits_per_page": credits_per_page,
+                "summarize_figures": usage.get("summarize_figures", False),
             }
         )
 
@@ -189,6 +208,49 @@ async def upload_pdf(file: UploadFile = File(...)):
     return UploadResponse(file_id=file_id, filename=file.filename)
 
 
+@router.post("/page-count", response_model=PageCountResponse)
+async def get_page_count(request: PageCountRequest):
+    """
+    Get the page count of an uploaded PDF file.
+
+    Args:
+        request: PageCountRequest with file_id
+
+    Returns:
+        PageCountResponse with page count and filename
+
+    Raises:
+        HTTPException: If file not found or invalid PDF
+    """
+    # Validate file exists
+    pdf_path = TEMP_DIR / f"{request.file_id}.pdf"
+    if not pdf_path.exists():
+        raise HTTPException(
+            status_code=404,
+            detail=f"File not found: {request.file_id}. Please upload the file first.",
+        )
+
+    try:
+        # Read PDF and get page count
+        reader = PdfReader(pdf_path)
+        page_count = len(reader.pages)
+
+        # Extract original filename from metadata if available
+        # For now, we'll use the file_id as filename
+        filename = f"{request.file_id}.pdf"
+
+        return PageCountResponse(
+            file_id=request.file_id,
+            page_count=page_count,
+            filename=filename
+        )
+    except Exception as e:
+        raise HTTPException(
+            status_code=500,
+            detail=f"Failed to read PDF: {str(e)}"
+        )
+
+
 @router.post("/compare", response_model=ParseCompareResponse)
 async def compare_parsers(request: ParseCompareRequest):
     """
@@ -219,17 +281,35 @@ async def compare_parsers(request: ParseCompareRequest):
             detail=f"Missing API keys for providers: {', '.join(missing_keys)}",
         )
 
-    # Initialize parsers with user-provided API keys
+    # Initialize parsers with user-provided API keys and configurations
     parsers: Dict[str, any] = {}
 
     try:
         if "llamaindex" in request.providers:
-            parsers["llamaindex"] = LlamaIndexParser(api_key=request.api_keys["llamaindex"])
+            # Get LlamaIndex config or use defaults
+            config = request.configs.get("llamaindex", {})
+            parse_mode = config.get("parse_mode", "parse_page_with_agent")
+            model = config.get("model", "openai-gpt-4-1-mini")
+            parsers["llamaindex"] = LlamaIndexParser(
+                api_key=request.api_keys["llamaindex"],
+                parse_mode=parse_mode,
+                model=model
+            )
 
         if "reducto" in request.providers:
-            parsers["reducto"] = ReductoParser(api_key=request.api_keys["reducto"])
+            # Get Reducto config or use defaults
+            config = request.configs.get("reducto", {})
+            summarize_figures = config.get("summarize_figures", False)
+            # Handle mode field (standard/complex) as well
+            if "mode" in config:
+                summarize_figures = config["mode"] == "complex"
+            parsers["reducto"] = ReductoParser(
+                api_key=request.api_keys["reducto"],
+                summarize_figures=summarize_figures
+            )
 
         if "landingai" in request.providers:
+            # LandingAI has no configurable options yet
             parsers["landingai"] = LandingAIParser(api_key=request.api_keys["landingai"])
 
     except ValueError as e:

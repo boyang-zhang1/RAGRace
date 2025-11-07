@@ -4,7 +4,11 @@
 
 RAGRace provides an automated benchmark framework to evaluate RAG providers on academic documents, Wikipedia articles, and more. All providers are tested on identical documents with standardized evaluation metrics (Ragas) for fair comparison.
 
-**Current Status**: Monorepo with FastAPI + Prisma ORM + Next.js frontend. Read-only API and web interface deployed. Full orchestrator pipeline with 3 RAG providers, benchmarking on Qasper (research papers), PolicyQA (privacy policies), and SQuAD 2.0 datasets. Results stored in Supabase PostgreSQL.
+**Current Status**:
+- **RAG Benchmarking**: Full orchestrator pipeline with 3 RAG providers, benchmarking on Qasper, PolicyQA, and SQuAD 2.0 datasets
+- **PDF Parsing**: Interactive web UI to compare PDF parsing across LlamaIndex, Reducto, and LandingAI with cost estimation
+- **Web Interface**: FastAPI + Prisma ORM + Next.js frontend with results visualization
+- **Database**: Supabase PostgreSQL for persistent storage
 
 ## Integrated Providers
 
@@ -14,52 +18,83 @@ RAGRace provides an automated benchmark framework to evaluate RAG providers on a
 | **[LandingAI](docs/ADAPTERS.md#landingai-ade-agentic-document-extraction)** | Doc Preprocessing | 8 chunk types, grounding metadata | ✅ Tested |
 | **[Reducto](docs/ADAPTERS.md#reducto)** | Doc Preprocessing | Embedding-optimized, AI enrichment | ✅ Tested |
 
+## PDF Parsing & Comparison
+
+RAGRace includes an interactive web interface to compare PDF parsing quality across providers:
+
+```bash
+# Start backend API
+cd backend
+uvicorn main:app --reload
+
+# Start frontend (in another terminal)
+cd frontend
+npm run dev
+
+# Open browser
+open http://localhost:3000/parse
+```
+
+**Features:**
+- 📄 Upload PDFs and get instant page count analysis
+- 💰 **Cost estimation** before parsing (configurable provider options)
+- ⚙️ Provider configuration:
+  - **LlamaIndex**: Choose parse mode (LLM vs Agent) and model (GPT-4o-mini, Sonnet 4.0)
+  - **Reducto**: Toggle VLM enhancement (standard 1 credit/page vs complex 2 credits/page)
+  - **LandingAI**: DPT-2 model
+- 🔄 Side-by-side comparison with page navigation
+- 📊 Processing time and actual cost tracking
+- 💾 Download parsed results
+
+**Workflow:** Upload PDF → Get page count → Review cost estimate → Configure providers → Parse & compare → Download results
+
 ## Web API
 
-RAGRace provides a FastAPI-based REST API for browsing benchmark results:
+RAGRace provides a FastAPI-based REST API:
 
 ```bash
 # Start the API server
 cd backend
 uvicorn main:app --reload
 
-# Browse results
-curl http://localhost:8000/api/v1/results
-curl http://localhost:8000/api/v1/results/{run_id}
-curl http://localhost:8000/api/v1/datasets
-
 # API documentation
 open http://localhost:8000/docs
 ```
 
-**Endpoints:**
-- `GET /api/v1/results` - List all completed benchmark runs (paginated, filterable)
-- `GET /api/v1/results/{run_id}` - Get full run details with nested provider results
+**Benchmark Endpoints:**
+- `GET /api/v1/results` - List all benchmark runs (paginated, filterable)
+- `GET /api/v1/results/{run_id}` - Get full run details
 - `GET /api/v1/datasets` - List available datasets
 
-All results are stored in Supabase PostgreSQL and accessed via Prisma ORM.
+**Parsing Endpoints:**
+- `POST /api/v1/parsing/upload` - Upload PDF file
+- `POST /api/v1/parsing/page-count` - Get page count
+- `POST /api/v1/parsing/compare` - Compare parsing across providers
+- `GET /api/v1/parsing/download-result/{file_id}` - Download results
 
 ## Web Frontend
 
-RAGRace includes a Next.js web interface for browsing benchmark results:
+RAGRace includes a Next.js web interface:
 
 ```bash
-# Start the frontend (requires backend API running)
 cd frontend
 npm install
 npm run dev
-
-# Open browser
 open http://localhost:3000
 ```
 
+**Pages:**
+- 📊 **Home** (`/`) - Browse all benchmark runs with sortable table
+- 🔍 **Run Details** (`/results/[id]`) - Detailed provider comparison with charts
+- 📚 **Datasets** (`/datasets`) - Available datasets info
+- 📄 **Parse** (`/parse`) - Interactive PDF parsing comparison with cost estimation
+
 **Features:**
-- 📊 Browse all benchmark runs with sortable table
-- 🔍 Detailed run view with provider comparison
-- 📝 Expandable question-by-question results
-- 🎯 Ground truth vs provider answers
-- 📈 Evaluation scores and latency metrics
-- 🎨 Responsive design with shadcn/ui components
+- Expandable question-by-question results
+- Ground truth vs provider answers
+- Evaluation scores and latency metrics
+- Responsive design with shadcn/ui
+- Interactive charts and visualizations
 
 See [frontend/README.md](frontend/README.md) for complete documentation.
 
@@ -280,57 +315,42 @@ pytest tests/ -v -m integration -s
 ## Project Structure
 
 ```
-RAGRace/                      # Monorepo root
-├── backend/                  # Python backend (benchmark engine + API)
-│   ├── main.py               # ⭐ FastAPI app entry point
-│   ├── api/                  # REST API (read-only, public)
-│   │   ├── db.py             # Prisma client singleton
-│   │   ├── models/           # Pydantic response models
-│   │   └── routers/          # API endpoints
-│   │       └── results.py    # GET /results, /results/{run_id}, /datasets
+RAGRace/
+├── backend/                  # Python backend (benchmarking + parsing + API)
+│   ├── main.py               # FastAPI app entry point
+│   ├── api/                  # REST API (benchmarks + parsing endpoints)
+│   │   ├── models/           # Pydantic models
+│   │   └── routers/          # Endpoint handlers (results, parsing)
 │   ├── prisma/               # Prisma ORM (Supabase PostgreSQL)
-│   │   ├── schema.prisma     # Database schema (7 models)
-│   │   └── migrations/       # SQL migrations
 │   ├── scripts/
-│   │   └── run_benchmark.py  # ⭐ CLI entry point for benchmarks
+│   │   └── run_benchmark.py  # CLI for running benchmarks
 │   ├── config/
-│   │   ├── benchmark_qasper.yaml    # Qasper benchmark config
-│   │   ├── benchmark_policyqa.yaml  # PolicyQA benchmark config
-│   │   ├── providers.yaml           # Provider registry
-│   │   └── providers.generated.yaml # Provider configs (AI-generated)
-│   ├── src/                  # Core pipeline components
-│   │   ├── core/
-│   │   │   ├── orchestrator.py      # Main benchmark coordinator
-│   │   │   ├── adapter_factory.py   # Provider instantiation
-│   │   │   ├── provider_executor.py # Parallel execution
-│   │   │   ├── document_processor.py # Document processing
-│   │   │   ├── result_saver.py      # Results management
-│   │   │   ├── ragas_evaluator.py   # Ragas metrics
-│   │   │   └── schemas.py           # Data structures
-│   │   ├── adapters/         # RAG provider adapters
-│   │   │   ├── base.py       # BaseAdapter interface
-│   │   │   ├── llamaindex_adapter.py
-│   │   │   ├── landingai_adapter.py
-│   │   │   └── reducto_adapter.py
+│   │   ├── benchmark_*.yaml      # Benchmark configs
+│   │   ├── providers.yaml        # Provider registry
+│   │   └── parsing_pricing.yaml  # Parsing cost config
+│   ├── src/
+│   │   ├── core/             # Orchestrator, executor, evaluator
+│   │   ├── adapters/         # RAG + parsing adapters
+│   │   │   ├── llamaindex_adapter.py, landingai_adapter.py, reducto_adapter.py
+│   │   │   └── parsing/      # Parsing adapters (3 providers)
 │   │   └── datasets/         # Dataset loaders
-│   │       ├── loader.py     # Main loader
-│   │       └── preprocessors/ # Dataset-specific preprocessing
-│   ├── tests/                # Unit and integration tests
-│   └── requirements.txt      # Python dependencies
-├── frontend/                 # Next.js 16 frontend (TypeScript, Tailwind, shadcn/ui)
-├── data/                     # Shared data (symlinked in backend/)
-│   ├── datasets/             # Downloaded datasets (auto-cached)
-│   │   ├── Qasper/           # Research papers (arxiv PDFs)
-│   │   ├── PolicyQA/         # Privacy policies (HTML→PDF)
-│   │   └── SQuAD2/           # Wikipedia articles
+│   └── tests/                # 55+ unit + integration tests
+├── frontend/                 # Next.js 16 (TypeScript, Tailwind, shadcn/ui)
+│   ├── app/                  # Pages (/, /results/[id], /datasets, /parse)
+│   ├── components/           # React components
+│   │   ├── parse/            # Parsing UI (upload, cost, comparison)
+│   │   ├── results/          # Benchmark results UI
+│   │   └── ui/               # shadcn/ui components
+│   ├── lib/                  # API client, utilities
+│   └── types/                # TypeScript types
+├── data/                     # Datasets + results (auto-cached)
+│   ├── datasets/             # Qasper, PolicyQA, SQuAD2
 │   └── results/              # Benchmark results (timestamped)
 ├── docs/                     # Documentation
 │   ├── ARCHITECTURE.md       # System architecture
 │   ├── ADAPTERS.md           # Adapter specifications
 │   └── DEVELOPMENT.md        # Development guide
-└── local_docs/               # AI working docs (session state)
-    ├── CLOUD_DEPLOYMENT_PLAN.md    # Deployment roadmap
-    └── IMPLEMENTATION_STEPS.md     # Implementation progress
+└── local_docs/               # AI working docs
 ```
 
 ## Documentation
@@ -342,18 +362,27 @@ RAGRace/                      # Monorepo root
 
 ## Key Features
 
-### 🎯 Evaluation & Fairness
+### 🎯 RAG Benchmarking
 
 - **Ragas Metrics**: Faithfulness, Factual Correctness, Context Recall
 - **Fair Comparison**: All providers tested on identical PDFs with identical questions
 - **Standardized Interface**: All providers implement `BaseAdapter`
 - **Real Documents**: Full-length research documents (10K+ tokens), not toy examples
-
-### 🔧 Technical
-
 - **3 RAG Providers**: LlamaIndex, LandingAI, Reducto
 - **3 Datasets**: Qasper (research papers), PolicyQA (privacy policies), SQuAD 2.0 (Wikipedia)
 - **Parallel Execution**: Semaphore-based rate limiting for (provider, document) tasks
+
+### 📄 PDF Parsing Comparison
+
+- **3 Parsing Providers**: LlamaIndex, Reducto, LandingAI
+- **Cost Estimation**: Preview costs before parsing with configurable provider options
+- **Quality Comparison**: Side-by-side markdown output with page navigation
+- **Flexible Configuration**: Choose parse modes, models, and enhancement options per provider
+- **Transparent Pricing**: Real-time cost tracking with detailed breakdowns
+- **Interactive UI**: Upload, configure, compare, and download results
+
+### 🔧 Technical
+
 - **HTML→PDF Pipeline**: Playwright-based conversion preserving document structure
 - **54+ Tests**: Unit and integration tests with real API validation
 - **Web Research**: Uses Playwright MCP to read actual API documentation (NO IMAGINATION)

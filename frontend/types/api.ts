@@ -132,3 +132,91 @@ export interface ProviderDetailResponse {
   overall_scores: Record<string, number>;
   documents: ProviderDocumentDetail[];
 }
+
+// PDF Parsing Types
+
+export interface LlamaIndexConfig {
+  parse_mode: string;
+  model: string;
+}
+
+export interface ReductoConfig {
+  mode: string;  // "standard" or "complex"
+  summarize_figures: boolean;
+}
+
+export interface LandingAIConfig {
+  model: string;  // Currently only "dpt-2"
+}
+
+export type ProviderConfig = LlamaIndexConfig | ReductoConfig | LandingAIConfig;
+
+export interface ParseCompareRequest {
+  file_id: string;
+  providers: string[];
+  api_keys: Record<string, string>;
+  configs?: Record<string, any>;
+}
+
+export interface PageData {
+  page_number: number;
+  markdown: string;
+  images: string[];
+  metadata: Record<string, any>;
+}
+
+export interface ProviderParseResult {
+  total_pages: number;
+  pages: PageData[];
+  processing_time: number;
+  usage: Record<string, any>;
+}
+
+export interface ParseCompareResponse {
+  file_id: string;
+  results: Record<string, ProviderParseResult>;
+}
+
+export interface UploadResponse {
+  file_id: string;
+  filename: string;
+}
+
+export interface PageCountRequest {
+  file_id: string;
+}
+
+export interface PageCountResponse {
+  file_id: string;
+  page_count: number;
+  filename: string;
+}
+
+export interface ProviderCost {
+  provider: string;
+  credits: number;
+  usd_per_credit: number;
+  total_usd: number;
+  details: Record<string, any>;
+}
+
+export interface CostComparisonResponse {
+  file_id: string;
+  costs: Record<string, ProviderCost>;
+  total_usd: number;
+}
+
+// Pricing configuration types for frontend display
+export interface ModelOption {
+  label: string;
+  value: string;
+  credits_per_page: number;
+  usd_per_page: number;
+  description?: string;
+}
+
+export interface ProviderPricingInfo {
+  provider: string;
+  models: ModelOption[];
+  usd_per_credit: number;
+}

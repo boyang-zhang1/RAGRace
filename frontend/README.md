@@ -1,10 +1,14 @@
 # RAGRace Frontend
 
-A Next.js web application for browsing and visualizing RAG (Retrieval-Augmented Generation) provider benchmark results.
+A Next.js web application for browsing RAG provider benchmark results and comparing PDF parsing quality.
 
 ## Overview
 
-This frontend provides a read-only interface to view benchmark results from the RAGRace backend API. Users can browse completed benchmark runs, compare provider performance, and drill down into detailed question-by-question results.
+This frontend provides:
+1. **Benchmark Results Browser** - Read-only interface to view RAG benchmark results from the backend API
+2. **PDF Parsing Comparison** - Interactive tool to compare PDF parsing across LlamaIndex, Reducto, and LandingAI with cost estimation
+
+Users can browse completed benchmark runs, compare provider performance, drill down into detailed question-by-question results, and test PDF parsing quality with real-time cost tracking.
 
 ## Prerequisites
 
@@ -61,23 +65,33 @@ frontend/
 │   ├── results/
 │   │   └── [run_id]/
 │   │       └── page.tsx          # Run details page
-│   └── datasets/
-│       └── page.tsx              # Datasets info page
+│   ├── datasets/
+│   │   └── page.tsx              # Datasets info page
+│   └── parse/
+│       └── page.tsx              # PDF parsing comparison page
 │
 ├── components/
 │   ├── ui/                       # shadcn/ui components
-│   │   ├── table.tsx
-│   │   ├── card.tsx
-│   │   ├── badge.tsx
-│   │   ├── button.tsx
-│   │   ├── skeleton.tsx
-│   │   └── collapsible.tsx
+│   │   ├── table.tsx, card.tsx, badge.tsx, button.tsx
+│   │   ├── skeleton.tsx, collapsible.tsx, select.tsx
+│   │   └── ...
 │   ├── layout/
 │   │   └── Navbar.tsx            # Navigation component
-│   └── results/
-│       ├── ResultsTable.tsx      # Benchmark runs table
-│       ├── RunDetails.tsx        # Detailed run view
-│       └── OverallResultsCard.tsx # Aggregate results with chart
+│   ├── results/
+│   │   ├── ResultsTable.tsx      # Benchmark runs table
+│   │   ├── RunDetails.tsx        # Detailed run view
+│   │   └── OverallResultsCard.tsx # Aggregate results with chart
+│   ├── parse/                    # PDF parsing components
+│   │   ├── ApiKeyForm.tsx        # API keys + provider config
+│   │   ├── CostEstimation.tsx    # Pre-parse cost estimation
+│   │   ├── FileUploadZone.tsx    # Drag-and-drop upload
+│   │   ├── PDFViewer.tsx         # PDF preview
+│   │   ├── MarkdownViewer.tsx    # Parsed markdown display
+│   │   ├── PageNavigator.tsx     # Page navigation controls
+│   │   ├── CostDisplay.tsx       # Actual cost breakdown
+│   │   └── ProcessingTimeDisplay.tsx # Processing time card
+│   └── providers/
+│       └── ProviderLabel.tsx     # Provider badge component
 │
 ├── lib/
 │   ├── api-client.ts             # Backend API client
@@ -131,10 +145,40 @@ frontend/
   - Document counts
   - Task types
 
+### Parse (`/parse`)
+- **Purpose**: Compare PDF parsing quality across providers
+- **Features**:
+  - **File Upload**:
+    - Drag-and-drop PDF upload
+    - Automatic page count analysis
+    - File size validation
+  - **Provider Configuration**:
+    - API key management (localStorage persistence)
+    - **LlamaIndex**: Parse mode selection (LLM vs Agent) and model choice (GPT-4o-mini, Sonnet 4.0)
+    - **Reducto**: VLM enhancement toggle (standard 1 credit/page vs complex 2 credits/page)
+    - **LandingAI**: DPT-2 model (fixed)
+  - **Cost Estimation**:
+    - Pre-parse cost breakdown by provider
+    - Shows credits per page and total USD cost
+    - Based on actual pricing config from backend
+    - Confirm button to proceed with parsing
+  - **Parsing Results**:
+    - Side-by-side comparison of parsed markdown
+    - Page-by-page navigation with synchronized scrolling
+    - PDF preview alongside markdown output
+    - Processing time per provider
+    - Actual cost tracking with detailed breakdown
+  - **Download**:
+    - Download parsed markdown results
+    - Export parsing metadata and costs
+- **Workflow**: Upload PDF → Analyze (page count) → Configure providers → Review cost estimate → Parse → Compare results → Download
+- **State Management**: API keys and provider configs persisted to localStorage
+
 ## API Integration
 
-The frontend communicates with the RAGRace backend through three main endpoints:
+The frontend communicates with the RAGRace backend through two groups of endpoints:
 
+### Benchmark Endpoints
 ```typescript
 // Get list of runs
 GET /api/v1/results?limit=50&offset=0&dataset=qasper
@@ -144,6 +188,33 @@ GET /api/v1/results/{run_id}
 
 // Get datasets
 GET /api/v1/datasets
+```
+
+### Parsing Endpoints
+```typescript
+// Upload PDF file
+POST /api/v1/parsing/upload
+Body: FormData with 'file' field
+
+// Get page count
+POST /api/v1/parsing/page-count
+Body: { file_id: string }
+
+// Compare parsing across providers
+POST /api/v1/parsing/compare
+Body: {
+  file_id: string,
+  providers: string[],
+  api_keys: { [provider: string]: string },
+  configs: {
+    llamaindex?: { parse_mode: string, model: string },
+    reducto?: { mode: string, summarize_figures: boolean },
+    landingai?: { model: string }
+  }
+}
+
+// Download parsing result
+GET /api/v1/parsing/download-result/{file_id}/{provider}
 ```
 
 See `lib/api-client.ts` for the full API client implementation.
@@ -161,6 +232,7 @@ See `lib/api-client.ts` for the full API client implementation.
 ## Features
 
 ### Implemented ✅
+**Benchmark Results:**
 - Server-side rendering for fast initial loads
 - Responsive design (mobile, tablet, desktop)
 - Loading skeletons during data fetching
@@ -172,6 +244,16 @@ See `lib/api-client.ts` for the full API client implementation.
 - **Charts and visualizations** (interactive bar charts with metric selection)
 - **Run-level aggregate results** with cross-document score averaging
 
+**PDF Parsing:**
+- Drag-and-drop file upload with validation
+- Real-time page count analysis
+- **Cost estimation before parsing** with provider-specific configs
+- Side-by-side parsing comparison with page navigation
+- Processing time and cost tracking
+- Provider configuration (parse modes, models, VLM enhancement)
+- localStorage persistence for API keys and configs
+- Download parsed results
+
 ### Future Enhancements 🚀
 - Additional chart types (radar charts, line charts)
 - Advanced filtering and sorting
@@ -180,6 +262,8 @@ See `lib/api-client.ts` for the full API client implementation.
 - Export results (CSV, JSON)
 - Real-time updates for running benchmarks
 - Search functionality
+- Batch PDF parsing
+- Historical parsing comparison
 
 ## Troubleshooting
 

@@ -14,12 +14,14 @@ from .base import BaseParseAdapter, PageResult, ParseResult
 class ReductoParser(BaseParseAdapter):
     """Parser using Reducto API with semantic chunking."""
 
-    def __init__(self, api_key: str):
+    def __init__(self, api_key: str, summarize_figures: bool = True):
         """
         Initialize Reducto parser.
 
         Args:
             api_key: API key for Reducto (required).
+            summarize_figures: Enable VLM enhancement for complex pages (default: True).
+                              True = 2 credits/page, False = 1 credit/page.
 
         Raises:
             ValueError: If api_key is empty or None.
@@ -27,6 +29,7 @@ class ReductoParser(BaseParseAdapter):
         if not api_key:
             raise ValueError("Reducto API key is required")
         self.api_key = api_key
+        self.summarize_figures = summarize_figures
 
     async def parse_pdf(self, pdf_path: Path) -> ParseResult:
         """
@@ -54,7 +57,7 @@ class ReductoParser(BaseParseAdapter):
             input=upload_response,
             enhance={
                 "agentic": [],
-                "summarize_figures": True,  # Add AI summaries for figures
+                "summarize_figures": self.summarize_figures,  # Configurable VLM enhancement
             },
             retrieval={
                 "chunking": {"chunk_mode": "variable"},  # Semantic chunking
@@ -124,8 +127,10 @@ class ReductoParser(BaseParseAdapter):
             usage_attr = result.__dict__['usage']
             usage = usage_attr if isinstance(usage_attr, dict) else usage_attr.__dict__
 
-        # Add num_pages to usage for cost calculation
+        # Add num_pages and config to usage for cost calculation
         usage['num_pages'] = len(pages)
+        usage['summarize_figures'] = self.summarize_figures
+        usage['mode'] = 'complex' if self.summarize_figures else 'standard'
 
         return ParseResult(
             provider="reducto",

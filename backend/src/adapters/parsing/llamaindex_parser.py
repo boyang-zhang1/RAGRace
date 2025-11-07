@@ -44,16 +44,22 @@ class LlamaIndexParser(BaseParseAdapter):
         start_time = time.time()
 
         # Initialize parser with optimal settings for markdown output
-        parser = LlamaParse(
-            api_key=self.api_key,
-            parse_mode=self.parse_mode,
-            model=self.model,
-            high_res_ocr=True,  # Better quality for tables/figures
-            adaptive_long_table=True,  # Handle long tables spanning pages
-            outlined_table_extraction=True,  # Preserve table structure
-            output_tables_as_HTML=True,  # Better table rendering in markdown
-            page_separator="\n\n---\n\n",  # Clear page breaks
-        )
+        # For parse_page_with_llm mode, model parameter may not be needed
+        parser_kwargs = {
+            "api_key": self.api_key,
+            "parse_mode": self.parse_mode,
+            "high_res_ocr": True,  # Better quality for tables/figures
+            "adaptive_long_table": True,  # Handle long tables spanning pages
+            "outlined_table_extraction": True,  # Preserve table structure
+            "output_tables_as_HTML": True,  # Better table rendering in markdown
+            "page_separator": "\n\n---\n\n",  # Clear page breaks
+        }
+
+        # Only add model parameter for agent-based parsing modes
+        if self.parse_mode == "parse_page_with_agent":
+            parser_kwargs["model"] = self.model
+
+        parser = LlamaParse(**parser_kwargs)
 
         # Parse the PDF (async)
         result = await parser.aparse(str(pdf_path))

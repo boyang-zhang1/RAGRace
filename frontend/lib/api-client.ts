@@ -11,6 +11,12 @@ import type {
   BenchmarkResponse,
   DatasetPerformanceSummary,
   ProviderDetailResponse,
+  UploadResponse,
+  PageCountRequest,
+  PageCountResponse,
+  ParseCompareRequest,
+  ParseCompareResponse,
+  CostComparisonResponse,
 } from '@/types/api';
 
 const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000';
@@ -155,7 +161,7 @@ class ApiClient {
    * @param file PDF file to upload
    * @returns Upload response with file_id and filename
    */
-  async uploadPdf(file: File): Promise<{ file_id: string; filename: string }> {
+  async uploadPdf(file: File): Promise<UploadResponse> {
     const formData = new FormData();
     formData.append('file', file);
 
@@ -173,38 +179,41 @@ class ApiClient {
   }
 
   /**
+   * Get page count of an uploaded PDF
+   *
+   * @param fileId UUID of uploaded file
+   * @returns Page count response with page count and filename
+   */
+  async getPageCount(fileId: string): Promise<PageCountResponse> {
+    return this.fetchWithError<PageCountResponse>('/api/v1/parse/page-count', {
+      method: 'POST',
+      body: JSON.stringify({ file_id: fileId }),
+    });
+  }
+
+  /**
    * Compare PDF parsing across multiple providers
    *
    * @param fileId UUID of uploaded file
    * @param apiKeys API keys for each provider
+   * @param configs Optional configurations for each provider
    * @returns Parse results from each provider
    */
   async compareParses(
     fileId: string,
-    apiKeys: Record<string, string>
-  ): Promise<{
-    file_id: string;
-    results: Record<string, {
-      total_pages: number;
-      pages: Array<{
-        page_number: number;
-        markdown: string;
-        images: string[];
-        metadata: Record<string, any>;
-      }>;
-      processing_time: number;
-      usage: Record<string, any>;
-    }>;
-  }> {
+    apiKeys: Record<string, string>,
+    configs?: Record<string, any>
+  ): Promise<ParseCompareResponse> {
     // Determine providers from api_keys
     const providers = Object.keys(apiKeys);
 
-    return this.fetchWithError('/api/v1/parse/compare', {
+    return this.fetchWithError<ParseCompareResponse>('/api/v1/parse/compare', {
       method: 'POST',
       body: JSON.stringify({
         file_id: fileId,
         providers,
         api_keys: apiKeys,
+        configs: configs || {},
       }),
     });
   }
@@ -215,18 +224,8 @@ class ApiClient {
    * @param parseResults Parse results from compareParses
    * @returns Cost breakdown for each provider
    */
-  async calculateParseCost(parseResults: any): Promise<{
-    file_id: string;
-    costs: Record<string, {
-      provider: string;
-      credits: number;
-      usd_per_credit: number;
-      total_usd: number;
-      details: Record<string, any>;
-    }>;
-    total_usd: number;
-  }> {
-    return this.fetchWithError('/api/v1/parse/calculate-cost', {
+  async calculateParseCost(parseResults: ParseCompareResponse): Promise<CostComparisonResponse> {
+    return this.fetchWithError<CostComparisonResponse>('/api/v1/parse/calculate-cost', {
       method: 'POST',
       body: JSON.stringify(parseResults),
     });

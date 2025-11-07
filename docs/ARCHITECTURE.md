@@ -3,9 +3,23 @@
 ## System Overview
 
 RAGRace consists of three main layers:
-1. **Backend (Python)** - Benchmark orchestration engine + FastAPI REST API
-2. **Frontend (TypeScript/React)** - Next.js web interface for browsing results
+1. **Backend (Python)** - Benchmark orchestration engine + PDF parsing system + FastAPI REST API
+2. **Frontend (TypeScript/React)** - Next.js web interface for browsing results and comparing PDF parsing
 3. **Database (PostgreSQL)** - Supabase with Prisma ORM for persistent storage
+
+## Core Systems
+
+### 1. RAG Benchmarking System
+- Automated evaluation of RAG providers on real-world datasets
+- Parallel execution with rate limiting
+- Ragas metric evaluation
+- Results persistence to database and filesystem
+
+### 2. PDF Parsing System
+- Compare PDF parsing quality across multiple providers
+- Cost estimation before parsing
+- Configurable provider options (parse modes, models, VLM enhancement)
+- Side-by-side markdown output comparison
 
 ## Web Stack
 
@@ -13,12 +27,18 @@ RAGRace consists of three main layers:
 - **Framework**: FastAPI with async support
 - **ORM**: Prisma Client Python (asyncio interface)
 - **Database**: Supabase PostgreSQL
-- **Endpoints** (Read-Only):
+- **Benchmark Endpoints** (Read-Only):
   - `GET /api/v1/results` - List benchmark runs (paginated, filterable)
   - `GET /api/v1/results/{run_id}` - Full run details with nested data
   - `GET /api/v1/datasets` - Available datasets metadata
+- **Parsing Endpoints**:
+  - `POST /api/v1/parsing/upload` - Upload PDF file (returns file_id)
+  - `POST /api/v1/parsing/page-count` - Get page count using pypdf
+  - `POST /api/v1/parsing/compare` - Parse PDF with selected providers and configs
+  - `GET /api/v1/parsing/download-result/{file_id}/{provider}` - Download markdown result
+- **Health Check**:
   - `GET /api/health` - Health check
-- **Response Models**: Pydantic schemas in `backend/api/models/responses.py`
+- **Response Models**: Pydantic schemas in `backend/api/models/`
 - **Features**: CORS enabled, auto-generated OpenAPI docs at `/docs`
 
 ### Frontend (`frontend/`)
@@ -31,6 +51,16 @@ RAGRace consists of three main layers:
   - `/` - Home page with benchmark runs table
   - `/results/[run_id]` - Detailed run view with aggregate results, interactive charts, and expandable Q&A
   - `/datasets` - Dataset information browser
+  - `/parse` - PDF parsing comparison with cost estimation
+- **Parsing UI Components** (`components/parse/`):
+  - `ApiKeyForm.tsx` - API key management + provider configuration (parse modes, models, VLM)
+  - `CostEstimation.tsx` - Pre-parse cost breakdown with provider-specific pricing
+  - `FileUploadZone.tsx` - Drag-and-drop upload with validation
+  - `PDFViewer.tsx` - PDF preview with page navigation
+  - `MarkdownViewer.tsx` - Parsed markdown display with syntax highlighting
+  - `PageNavigator.tsx` - Page navigation controls
+  - `CostDisplay.tsx` - Actual cost breakdown after parsing
+  - `ProcessingTimeDisplay.tsx` - Processing time metrics
 - **API Client**: Type-safe wrapper in `frontend/lib/api-client.ts`
 - **Types**: Full TypeScript coverage matching backend schemas
 - **Features**:
@@ -38,6 +68,7 @@ RAGRace consists of three main layers:
   - Run-level aggregate results with cross-document score averaging
   - Interactive metric comparison charts with selectable metrics
   - Provider performance visualization
+  - localStorage persistence for API keys and configs
 
 ### Database Schema (Prisma)
 - **7 Models**: User, BenchmarkRun, Document, Question, ProviderResult, QuestionResult, ApiRequest
@@ -82,11 +113,61 @@ RAGRace consists of three main layers:
 - **rag_logger.py** - Structured logging for multi-document experiments
 
 ### Adapters (`src/adapters/`)
-- **base.py** - BaseAdapter interface (ALL providers must implement)
+- **base.py** - BaseAdapter interface (ALL RAG providers must implement)
 - **llamaindex_adapter.py** - LlamaIndex integration (VectorStoreIndex)
 - **landingai_adapter.py** - LandingAI ADE integration (document preprocessing)
 - **reducto_adapter.py** - Reducto integration (RAG-optimized processing)
 - **__init__.py** - Exports all adapters
+
+### Parsing Adapters (`src/adapters/parsing/`)
+All parsing adapters implement `BaseParseAdapter` interface:
+```python
+class BaseParseAdapter(ABC):
+    async def parse_pdf(pdf_path: Path) -> ParseResult
+```
+
+**Implemented Parsers:**
+- **llamaindex_parser.py** - LlamaIndex LlamaParse API
+  - Configurable parse modes: `parse_page_with_llm` (3 credits/page) or `parse_page_with_agent` (20-90 credits/page)
+  - Model selection: GPT-4o-mini (20 credits/page), Sonnet 4.0 (90 credits/page)
+  - High-res OCR, adaptive long table handling, HTML table output
+  - Returns markdown with page separators
+
+- **reducto_parser.py** - Reducto API
+  - Configurable VLM enhancement: standard (1 credit/page) or complex (2 credits/page)
+  - Semantic chunking with embedding optimization
+  - AI figure summarization (when VLM enabled)
+  - Returns structured markdown with metadata
+
+- **landingai_parser.py** - LandingAI ADE API
+  - Fixed DPT-2 model (3 credits/page)
+  - 8 semantic chunk types (text, table, figure, logo, card, etc.)
+  - Grounding metadata with bounding boxes
+  - Returns page-by-page markdown
+
+**Pricing Configuration** (`backend/config/parsing_pricing.yaml`):
+- Provider-specific pricing (USD per credit)
+- Model/mode-specific credits per page
+- Used for cost estimation and actual cost calculation
+
+**Common Structure:**
+```python
+@dataclass
+class PageResult:
+    page_number: int
+    markdown: str
+    images: List[str]
+    metadata: Dict[str, Any]
+
+@dataclass
+class ParseResult:
+    provider: str
+    total_pages: int
+    pages: List[PageResult]
+    raw_response: Dict[str, Any]
+    processing_time: float
+    usage: Dict[str, Any]  # Credits, mode, etc.
+```
 
 ### Datasets (`src/datasets/`)
 - **loader.py** - Load datasets
@@ -250,6 +331,100 @@ RAGResponse(answer, context, metadata, latency_ms, tokens_used)
 - DocumentProcessor class kept for backward compatibility
 - New code uses Orchestrator.run_benchmark() directly
 
+### PDF Parsing Pipeline
+
+```
+1. User Interaction (Frontend /parse page)
+   ├─ Upload PDF via drag-and-drop
+   ├─ POST /api/v1/parsing/upload → get file_id
+   └─ POST /api/v1/parsing/page-count → get page count
+
+2. Cost Estimation (Frontend)
+   ├─ User configures provider options:
+   │  ├─ LlamaIndex: parse_mode (llm/agent) + model (gpt-4o-mini/sonnet-4.0)
+   │  ├─ Reducto: VLM enhancement (standard/complex)
+   │  └─ LandingAI: model (dpt-2)
+   ├─ Frontend calculates estimated cost:
+   │  ├─ Read pricing from PRICING constant (matches backend config)
+   │  ├─ Calculate: page_count × credits_per_page × usd_per_credit
+   │  └─ Display per-provider breakdown
+   └─ User confirms to proceed
+
+3. Parsing Execution (Backend API)
+   POST /api/v1/parsing/compare
+   ├─ Validate file exists (TEMP_DIR/{file_id}.pdf)
+   ├─ Initialize parsers with API keys and configs:
+   │  ├─ LlamaIndexParser(api_key, parse_mode, model)
+   │  ├─ ReductoParser(api_key, summarize_figures)
+   │  └─ LandingAIParser(api_key)
+   └─ Execute parsing in parallel (asyncio.gather):
+       ├─ Each parser.parse_pdf(pdf_path) runs independently
+       ├─ Returns ParseResult with pages, markdown, usage
+       └─ Exception handling per provider (don't fail all)
+
+4. Cost Calculation (Backend)
+   For each provider result:
+   ├─ Read parsing_pricing.yaml
+   ├─ Match provider + mode/model to get credits_per_page
+   ├─ Calculate: usage.num_pages × credits_per_page × usd_per_credit
+   └─ Return ProviderCost with breakdown
+
+5. Result Display (Frontend)
+   ├─ Side-by-side comparison of parsed markdown
+   ├─ Page navigation with synchronized scrolling
+   ├─ PDF preview alongside markdown
+   ├─ Cost breakdown (estimated vs actual)
+   ├─ Processing time per provider
+   └─ Download buttons for markdown results
+
+6. Cleanup
+   ├─ Files stored in TEMP_DIR with UUID filenames
+   ├─ Manual cleanup (no auto-deletion)
+   └─ Download results via GET /api/v1/parsing/download-result/{file_id}/{provider}
+```
+
+**Key Features:**
+- **Async Execution**: All parsers run in parallel using asyncio
+- **Independent Failures**: One provider failing doesn't affect others
+- **Cost Transparency**: Estimate shown before parsing, actual cost after
+- **Configurable Options**: Different parse modes/models affect cost and quality
+- **localStorage Persistence**: API keys and configs saved in browser
+- **No Database**: Parsing results not persisted (temporary files only)
+
+**Pricing Model:**
+```yaml
+# backend/config/parsing_pricing.yaml
+llamaindex:
+  usd_per_credit: 0.001
+  models:
+    - parse_mode: "parse_page_with_llm"
+      credits_per_page: 3        # $0.003/page
+    - parse_mode: "parse_page_with_agent"
+      model: "openai-gpt-4-1-mini"
+      credits_per_page: 20       # $0.020/page
+    - parse_mode: "parse_page_with_agent"
+      model: "anthropic-sonnet-4.0"
+      credits_per_page: 90       # $0.090/page
+
+reducto:
+  usd_per_credit: 0.015
+  models:
+    - mode: "standard"
+      credits_per_page: 1        # $0.015/page
+    - mode: "complex"
+      credits_per_page: 2        # $0.030/page
+
+landingai:
+  usd_per_credit: 0.01
+  models:
+    - model: "dpt-2"
+      credits_per_page: 3        # $0.030/page
+```
+
+**Legacy Support**:
+- DocumentProcessor class kept for backward compatibility
+- New code uses Orchestrator.run_benchmark() directly
+
 ## Tech Stack
 
 - **Python 3.11+**
@@ -260,7 +435,10 @@ RAGResponse(answer, context, metadata, latency_ms, tokens_used)
   - `requests` (HTTP API calls)
   - `numpy` (vector operations)
   - `ragas` (RAG evaluation metrics)
-- **Testing**: `pytest` (50+ tests, unit + integration)
+  - `pypdf` (PDF page counting)
+- **Web Framework**: `fastapi`, `uvicorn` (async API server)
+- **ORM**: `prisma` (Supabase PostgreSQL)
+- **Testing**: `pytest` (55+ tests, unit + integration)
 - **Web Research**: Playwright MCP (via Task tool)
 - **Environment**: `python-dotenv` (API key management)
 
