@@ -84,14 +84,24 @@ export function MarkdownViewer({
             Parsing with {title}...
           </div>
         ) : markdown ? (
-          <div className="prose dark:prose-invert max-w-none prose-lg prose-headings:font-bold prose-h1:text-3xl prose-h2:text-2xl prose-h3:text-xl text-[17px] leading-relaxed">
-            <ReactMarkdown
-              remarkPlugins={[remarkGfm]}
-              rehypePlugins={[rehypeRaw]}
-              components={markdownComponents}
-            >
-              {markdown}
-            </ReactMarkdown>
+          <div className="space-y-4">
+            <div className="prose dark:prose-invert max-w-none prose-lg prose-headings:font-bold prose-h1:text-3xl prose-h2:text-2xl prose-h3:text-xl text-[17px] leading-relaxed">
+              <ReactMarkdown
+                remarkPlugins={[remarkGfm]}
+                rehypePlugins={[rehypeRaw]}
+                components={markdownComponents}
+              >
+                {markdown}
+              </ReactMarkdown>
+            </div>
+            <details className="rounded-md border border-gray-200 dark:border-gray-800 bg-gray-50 dark:bg-gray-900/30 p-4 text-sm text-gray-600 dark:text-gray-300">
+              <summary className="cursor-pointer font-medium">
+                Original Markdown / HTML
+              </summary>
+              <pre className="mt-3 whitespace-pre-wrap break-words text-xs text-gray-800 dark:text-gray-100 bg-transparent">
+                {markdown}
+              </pre>
+            </details>
           </div>
         ) : (
           <div className="text-center text-gray-400 p-4 italic">
