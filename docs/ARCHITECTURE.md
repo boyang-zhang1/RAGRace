@@ -128,8 +128,8 @@ class BaseParseAdapter(ABC):
 
 **Implemented Parsers:**
 - **llamaindex_parser.py** - LlamaIndex LlamaParse API
-  - Configurable parse modes: `parse_page_with_llm` (3 credits/page) or `parse_page_with_agent` (20-90 credits/page)
-  - Model selection: GPT-4o-mini (20 credits/page), Sonnet 4.0 (90 credits/page)
+  - Configurable parse modes: `parse_page_with_llm` (3 credits/page) or `parse_page_with_agent` (10-90 credits/page)
+  - Model selection: GPT-4o-mini (10 credits/page), Sonnet 4.0 (90 credits/page)
   - High-res OCR, adaptive long table handling, HTML table output
   - Returns markdown with page separators
 
@@ -401,7 +401,7 @@ llamaindex:
       credits_per_page: 3        # $0.003/page
     - parse_mode: "parse_page_with_agent"
       model: "openai-gpt-4-1-mini"
-      credits_per_page: 20       # $0.020/page
+      credits_per_page: 10       # $0.010/page
     - parse_mode: "parse_page_with_agent"
       model: "anthropic-sonnet-4.0"
       credits_per_page: 90       # $0.090/page

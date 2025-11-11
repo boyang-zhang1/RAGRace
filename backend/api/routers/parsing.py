@@ -96,7 +96,7 @@ def calculate_provider_cost(provider: str, usage: Dict, pricing_config: Dict) ->
 
         if credits_per_page is None:
             # Default if not found
-            credits_per_page = 20
+            credits_per_page = 10
 
         total_credits = num_pages * credits_per_page
         total_usd = total_credits * usd_per_credit

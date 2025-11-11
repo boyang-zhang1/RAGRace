@@ -33,7 +33,7 @@ const PRICING = {
       {
         parse_mode: "parse_page_with_agent",
         model: "openai-gpt-4-1-mini",
-        credits_per_page: 20,
+        credits_per_page: 10,
       },
       {
         parse_mode: "parse_page_with_agent",

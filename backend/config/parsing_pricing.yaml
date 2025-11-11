@@ -16,7 +16,7 @@ llamaindex:
     # parse_page_with_agent mode
     - parse_mode: "parse_page_with_agent"
       model: "openai-gpt-4-1-mini"
-      credits_per_page: 20
+      credits_per_page: 10
       description: "GPT-4 mini agent parsing"
 
     - parse_mode: "parse_page_with_agent"

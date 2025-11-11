@@ -59,9 +59,9 @@ const PRICING = {
       {
         parse_mode: "parse_page_with_agent",
         model: "openai-gpt-4-1-mini",
-        credits_per_page: 20,
+        credits_per_page: 10,
         description: "Agentic",
-        detailedDescription: "Agentic - 20 credits/page ($0.020/page)",
+        detailedDescription: "Agentic - 10 credits/page ($0.010/page)",
       },
       {
         parse_mode: "parse_page_with_agent",

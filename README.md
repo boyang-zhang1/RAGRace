@@ -130,7 +130,7 @@ cp backend/.env.example backend/.env
 ### 3. Run Your First Benchmark
 
 ```bash
-# Quick test: 1 document, 1 question per document (~2 minutes, ~$0.20)
+# Quick test: 1 document, 1 question per document (~2 minutes, ~$0.10)
 python backend/scripts/run_benchmark.py --docs 1 --questions 1
 
 # Small benchmark: 2 documents, 3 questions each (~5 minutes, ~$1.00)
@@ -296,7 +296,7 @@ python scripts/run_benchmark.py --resume run_20251018_103045
 - **Total: ~$0.50 per document**
 
 **Common benchmarks:**
-- 1 document, 1 question: ~$0.20 (quick test)
+- 1 document, 1 question: ~$0.10 (quick test)
 - 10 documents, 3 questions: ~$5.00 (small benchmark)
 - 100 documents, all questions: ~$50+ (full evaluation)
 
