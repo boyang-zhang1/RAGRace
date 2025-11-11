@@ -2,7 +2,7 @@
 
 import { useState } from "react";
 import { FileUploadZone } from "@/components/parse/FileUploadZone";
-import { ApiKeyForm } from "@/components/parse/ApiKeyForm";
+import { ProviderConfigForm } from "@/components/parse/ProviderConfigForm";
 import { PDFViewer } from "@/components/parse/PDFViewer";
 import { MarkdownViewer } from "@/components/parse/MarkdownViewer";
 import { CostDisplay } from "@/components/parse/CostDisplay";
@@ -45,12 +45,6 @@ interface CostResults {
   [provider: string]: CostData;
 }
 
-interface ApiKeys {
-  llamaindex?: string;
-  reducto?: string;
-  landingai?: string;
-}
-
 interface ProviderConfigs {
   llamaindex?: {
     parse_mode: string;
@@ -66,8 +60,11 @@ interface ProviderConfigs {
 }
 
 export default function ParsePage() {
-  const [apiKeys, setApiKeys] = useState<ApiKeys>({});
-  const [hasApiKeys, setHasApiKeys] = useState(false);
+  const [selectedProviders, setSelectedProviders] = useState<string[]>([
+    "llamaindex",
+    "reducto",
+    "landingai",
+  ]);
   const [providerConfigs, setProviderConfigs] = useState<ProviderConfigs>({});
   const [fileId, setFileId] = useState<string | null>(null);
   const [fileName, setFileName] = useState<string>("");
@@ -81,9 +78,8 @@ export default function ParsePage() {
   const [isParsing, setIsParsing] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
-  const handleKeysChange = (keys: ApiKeys, hasAtLeastOne: boolean) => {
-    setApiKeys(keys);
-    setHasApiKeys(hasAtLeastOne);
+  const handleSelectionChange = (selected: string[]) => {
+    setSelectedProviders(selected);
   };
 
   const handleConfigsChange = (configs: ProviderConfigs) => {
@@ -125,23 +121,15 @@ export default function ParsePage() {
     setError(null);
 
     try {
-      // Filter out empty keys
-      const validKeys: Record<string, string> = {};
-      Object.entries(apiKeys).forEach(([provider, key]) => {
-        if (key && key.trim()) {
-          validKeys[provider] = key;
-        }
-      });
-
-      // Prepare configs for providers with API keys
+      // Prepare configs for selected providers
       const configs: Record<string, any> = {};
-      Object.keys(validKeys).forEach((provider) => {
+      selectedProviders.forEach((provider) => {
         if (providerConfigs[provider as keyof ProviderConfigs]) {
           configs[provider] = providerConfigs[provider as keyof ProviderConfigs];
         }
       });
 
-      const data = await apiClient.compareParses(fileId, validKeys, configs);
+      const data = await apiClient.compareParses(fileId, selectedProviders, configs);
       setParseResults(data.results);
 
       // Set total pages from first available provider
@@ -185,11 +173,6 @@ export default function ParsePage() {
     return page?.markdown;
   };
 
-  // Get list of providers that will be run (have API keys)
-  const selectedProviders = Object.entries(apiKeys)
-    .filter(([_, key]) => key && key.trim())
-    .map(([provider]) => provider);
-
   // Get list of providers that were run (have results)
   const runProviders = parseResults ? Object.keys(parseResults) : [];
 
@@ -209,21 +192,24 @@ export default function ParsePage() {
         </div>
       )}
 
-      {/* API Key Form - Always visible at top */}
+      {/* Provider Configuration */}
       <div className="mb-6">
-        <ApiKeyForm
-          onKeysChange={handleKeysChange}
+        <ProviderConfigForm
           onConfigsChange={handleConfigsChange}
+          onSelectionChange={handleSelectionChange}
           disabled={isUploading || isParsing}
         />
       </div>
 
       {!fileId ? (
         <div className="max-w-2xl mx-auto">
-          <FileUploadZone onUpload={handleUpload} disabled={!hasApiKeys} />
-          {!hasApiKeys && (
+          <FileUploadZone
+            onUpload={handleUpload}
+            disabled={selectedProviders.length === 0}
+          />
+          {selectedProviders.length === 0 && (
             <p className="mt-4 text-center text-sm text-gray-500">
-              Please provide at least one API key above to enable upload
+              Please select at least one provider above to enable upload
             </p>
           )}
           {isUploading && (

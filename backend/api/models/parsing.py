@@ -67,10 +67,6 @@ class ParseCompareRequest(BaseModel):
         {
             "file_id": "550e8400-e29b-41d4-a716-446655440000",
             "providers": ["llamaindex", "reducto"],
-            "api_keys": {
-                "llamaindex": "llx_...",
-                "reducto": "sk_..."
-            },
             "configs": {
                 "llamaindex": {"parse_mode": "parse_page_with_agent", "model": "openai-gpt-4-1-mini"},
                 "reducto": {"mode": "standard", "summarize_figures": false}
@@ -83,9 +79,6 @@ class ParseCompareRequest(BaseModel):
         default=["llamaindex", "reducto"],
         description="List of parser providers to compare",
     )
-    api_keys: Dict[str, str] = Field(
-        ..., description="API keys for each provider"
-    )
     configs: Dict[str, Dict[str, Any]] = Field(
         default={},
         description="Optional configurations for each provider"
@@ -96,10 +89,6 @@ class ParseCompareRequest(BaseModel):
             "example": {
                 "file_id": "550e8400-e29b-41d4-a716-446655440000",
                 "providers": ["llamaindex", "reducto"],
-                "api_keys": {
-                    "llamaindex": "llx_...",
-                    "reducto": "sk_..."
-                },
                 "configs": {
                     "llamaindex": {"parse_mode": "parse_page_with_agent", "model": "openai-gpt-4-1-mini"},
                     "reducto": {"mode": "standard", "summarize_figures": False}

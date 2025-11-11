@@ -34,6 +34,17 @@ router = APIRouter(prefix="/parse", tags=["parsing"])
 TEMP_DIR = Path("data/temp")
 TEMP_DIR.mkdir(parents=True, exist_ok=True)
 
+
+@router.get("/available-providers")
+async def get_available_providers():
+    """
+    Get list of available parsing providers.
+
+    Returns:
+        List of provider names that can be used for parsing
+    """
+    return ["llamaindex", "reducto", "landingai"]
+
 # Pricing configuration path
 # Try multiple possible locations
 def get_pricing_config_path() -> Path:
@@ -273,15 +284,7 @@ async def compare_parsers(request: ParseCompareRequest):
             detail=f"File not found: {request.file_id}. Please upload the file first.",
         )
 
-    # Validate that each provider has a corresponding API key
-    missing_keys = [p for p in request.providers if p not in request.api_keys]
-    if missing_keys:
-        raise HTTPException(
-            status_code=400,
-            detail=f"Missing API keys for providers: {', '.join(missing_keys)}",
-        )
-
-    # Initialize parsers with user-provided API keys and configurations
+    # Initialize parsers with backend environment API keys and configurations
     parsers: Dict[str, any] = {}
 
     try:
@@ -290,8 +293,14 @@ async def compare_parsers(request: ParseCompareRequest):
             config = request.configs.get("llamaindex", {})
             parse_mode = config.get("parse_mode", "parse_page_with_agent")
             model = config.get("model", "openai-gpt-4-1-mini")
+
+            # Get API key from environment
+            api_key = os.getenv("LLAMAINDEX_API_KEY")
+            if not api_key:
+                raise ValueError("LLAMAINDEX_API_KEY not configured in backend environment")
+
             parsers["llamaindex"] = LlamaIndexParser(
-                api_key=request.api_keys["llamaindex"],
+                api_key=api_key,
                 parse_mode=parse_mode,
                 model=model
             )
@@ -303,19 +312,30 @@ async def compare_parsers(request: ParseCompareRequest):
             # Handle mode field (standard/complex) as well
             if "mode" in config:
                 summarize_figures = config["mode"] == "complex"
+
+            # Get API key from environment
+            api_key = os.getenv("REDUCTO_API_KEY")
+            if not api_key:
+                raise ValueError("REDUCTO_API_KEY not configured in backend environment")
+
             parsers["reducto"] = ReductoParser(
-                api_key=request.api_keys["reducto"],
+                api_key=api_key,
                 summarize_figures=summarize_figures
             )
 
         if "landingai" in request.providers:
+            # Get API key from environment
+            api_key = os.getenv("VISION_AGENT_API_KEY")
+            if not api_key:
+                raise ValueError("VISION_AGENT_API_KEY not configured in backend environment")
+
             # LandingAI has no configurable options yet
-            parsers["landingai"] = LandingAIParser(api_key=request.api_keys["landingai"])
+            parsers["landingai"] = LandingAIParser(api_key=api_key)
 
     except ValueError as e:
         raise HTTPException(
-            status_code=400,
-            detail=f"Invalid API key: {str(e)}",
+            status_code=500,
+            detail=f"Configuration error: {str(e)}",
         )
 
     # Parse with all providers in parallel

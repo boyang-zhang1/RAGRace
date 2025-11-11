@@ -192,27 +192,34 @@ class ApiClient {
   }
 
   /**
+   * Get list of available parsing providers
+   *
+   * @returns Array of provider names
+   */
+  async getAvailableProviders(): Promise<string[]> {
+    return this.fetchWithError<string[]>('/api/v1/parse/available-providers', {
+      method: 'GET',
+    });
+  }
+
+  /**
    * Compare PDF parsing across multiple providers
    *
    * @param fileId UUID of uploaded file
-   * @param apiKeys API keys for each provider
+   * @param providers List of providers to use
    * @param configs Optional configurations for each provider
    * @returns Parse results from each provider
    */
   async compareParses(
     fileId: string,
-    apiKeys: Record<string, string>,
+    providers: string[],
     configs?: Record<string, any>
   ): Promise<ParseCompareResponse> {
-    // Determine providers from api_keys
-    const providers = Object.keys(apiKeys);
-
     return this.fetchWithError<ParseCompareResponse>('/api/v1/parse/compare', {
       method: 'POST',
       body: JSON.stringify({
         file_id: fileId,
         providers,
-        api_keys: apiKeys,
         configs: configs || {},
       }),
     });
