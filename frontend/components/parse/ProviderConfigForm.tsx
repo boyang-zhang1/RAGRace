@@ -1,7 +1,6 @@
 "use client";
 
 import { useState, useEffect } from "react";
-import { Label } from "@/components/ui/label";
 import { Checkbox } from "@/components/ui/checkbox";
 import {
   Select,
@@ -201,10 +200,10 @@ export function ProviderConfigForm({
         <h2 className="text-lg font-semibold">Provider Configuration</h2>
       </div>
 
-      <div className="space-y-4">
-        {/* LlamaIndex */}
-        <div className="pb-4 border-b">
-          <div className="flex items-center mb-3 gap-2">
+      <div className="grid grid-cols-3 gap-6">
+        {/* LlamaIndex Column */}
+        <div className="space-y-2">
+          <div className="flex items-center gap-2 mb-2">
             <Checkbox
               id="provider-llamaindex"
               checked={selectedProviders.includes("llamaindex")}
@@ -218,48 +217,43 @@ export function ProviderConfigForm({
               nameClassName="text-sm font-medium"
             />
           </div>
-          <div>
-            <Label htmlFor="llamaindex-model" className="text-xs text-gray-600 mb-2 block">
-              Model
-            </Label>
-            <Select
-              value={configs.llamaindex ? llamaIndexConfigToValue(configs.llamaindex) : ""}
-              onValueChange={(value) => {
-                const option = llamaOptions.find((model) => model.value === value);
-                if (option) {
-                  handleFullConfigChange("llamaindex", option.config);
-                }
-              }}
-              disabled={
-                disabled ||
-                !selectedProviders.includes("llamaindex") ||
-                llamaOptions.length === 0
+          <Select
+            value={configs.llamaindex ? llamaIndexConfigToValue(configs.llamaindex) : ""}
+            onValueChange={(value) => {
+              const option = llamaOptions.find((model) => model.value === value);
+              if (option) {
+                handleFullConfigChange("llamaindex", option.config);
               }
-            >
-              <SelectTrigger id="llamaindex-model">
-                <SelectValue />
-              </SelectTrigger>
-              <SelectContent>
-                {llamaOptions.map((model) => (
-                  <SelectItem key={model.value} value={model.value}>
-                    {formatOptionDescription(model)}
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
-            {llamaOptions.length === 0 && (
-              <p className="mt-2 text-xs text-gray-500">
-                {pricingLoading
-                  ? "Loading pricing..."
-                  : pricingError || "Pricing data unavailable."}
-              </p>
-            )}
-          </div>
+            }}
+            disabled={
+              disabled ||
+              !selectedProviders.includes("llamaindex") ||
+              llamaOptions.length === 0
+            }
+          >
+            <SelectTrigger id="llamaindex-model">
+              <SelectValue />
+            </SelectTrigger>
+            <SelectContent>
+              {llamaOptions.map((model) => (
+                <SelectItem key={model.value} value={model.value}>
+                  {formatOptionDescription(model)}
+                </SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+          {llamaOptions.length === 0 && (
+            <p className="mt-2 text-xs text-gray-500">
+              {pricingLoading
+                ? "Loading pricing..."
+                : pricingError || "Pricing data unavailable."}
+            </p>
+          )}
         </div>
 
-        {/* Reducto */}
-        <div className="pb-4 border-b">
-          <div className="flex items-center mb-3 gap-2">
+        {/* Reducto Column */}
+        <div className="space-y-2">
+          <div className="flex items-center gap-2 mb-2">
             <Checkbox
               id="provider-reducto"
               checked={selectedProviders.includes("reducto")}
@@ -273,48 +267,43 @@ export function ProviderConfigForm({
               nameClassName="text-sm font-medium"
             />
           </div>
-          <div>
-            <Label htmlFor="reducto-mode" className="text-xs text-gray-600 mb-2 block">
-              Mode
-            </Label>
-            <Select
-              value={configs.reducto ? reductoConfigToValue(configs.reducto) : ""}
-              onValueChange={(value) => {
-                const option = reductoOptions.find((model) => model.value === value);
-                if (option) {
-                  handleFullConfigChange("reducto", option.config);
-                }
-              }}
-              disabled={
-                disabled ||
-                !selectedProviders.includes("reducto") ||
-                reductoOptions.length === 0
+          <Select
+            value={configs.reducto ? reductoConfigToValue(configs.reducto) : ""}
+            onValueChange={(value) => {
+              const option = reductoOptions.find((model) => model.value === value);
+              if (option) {
+                handleFullConfigChange("reducto", option.config);
               }
-            >
-              <SelectTrigger id="reducto-mode">
-                <SelectValue />
-              </SelectTrigger>
-              <SelectContent>
-                {reductoOptions.map((model) => (
-                  <SelectItem key={model.value} value={model.value}>
-                    {formatOptionDescription(model)}
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
-            {reductoOptions.length === 0 && (
-              <p className="mt-2 text-xs text-gray-500">
-                {pricingLoading
-                  ? "Loading pricing..."
-                  : pricingError || "Pricing data unavailable."}
-              </p>
-            )}
-          </div>
+            }}
+            disabled={
+              disabled ||
+              !selectedProviders.includes("reducto") ||
+              reductoOptions.length === 0
+            }
+          >
+            <SelectTrigger id="reducto-mode">
+              <SelectValue />
+            </SelectTrigger>
+            <SelectContent>
+              {reductoOptions.map((model) => (
+                <SelectItem key={model.value} value={model.value}>
+                  {formatOptionDescription(model)}
+                </SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+          {reductoOptions.length === 0 && (
+            <p className="mt-2 text-xs text-gray-500">
+              {pricingLoading
+                ? "Loading pricing..."
+                : pricingError || "Pricing data unavailable."}
+            </p>
+          )}
         </div>
 
-        {/* LandingAI */}
-        <div>
-          <div className="flex items-center mb-3 gap-2">
+        {/* LandingAI Column */}
+        <div className="space-y-2">
+          <div className="flex items-center gap-2 mb-2">
             <Checkbox
               id="provider-landingai"
               checked={selectedProviders.includes("landingai")}
@@ -328,43 +317,38 @@ export function ProviderConfigForm({
               nameClassName="text-sm font-medium"
             />
           </div>
-          <div>
-            <Label htmlFor="landingai-model" className="text-xs text-gray-600 mb-2 block">
-              Model
-            </Label>
-            <Select
-              value={landingaiValue || undefined}
-              onValueChange={(value) => {
-                const option = landingaiOptions.find((model) => model.value === value);
-                if (option) {
-                  handleFullConfigChange("landingai", option.config);
-                }
-              }}
-              disabled={
-                disabled ||
-                !selectedProviders.includes("landingai") ||
-                landingaiOptions.length === 0
+          <Select
+            value={landingaiValue || undefined}
+            onValueChange={(value) => {
+              const option = landingaiOptions.find((model) => model.value === value);
+              if (option) {
+                handleFullConfigChange("landingai", option.config);
               }
-            >
-              <SelectTrigger id="landingai-model">
-                <SelectValue />
-              </SelectTrigger>
-              <SelectContent>
-                {landingaiOptions.map((model) => (
-                  <SelectItem key={model.value} value={model.value}>
-                    {formatOptionDescription(model)}
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
-            {landingaiOptions.length === 0 && (
-              <p className="mt-2 text-xs text-gray-500">
-                {pricingLoading
-                  ? "Loading pricing..."
-                  : pricingError || "Pricing data unavailable."}
-              </p>
-            )}
-          </div>
+            }}
+            disabled={
+              disabled ||
+              !selectedProviders.includes("landingai") ||
+              landingaiOptions.length === 0
+            }
+          >
+            <SelectTrigger id="landingai-model">
+              <SelectValue />
+            </SelectTrigger>
+            <SelectContent>
+              {landingaiOptions.map((model) => (
+                <SelectItem key={model.value} value={model.value}>
+                  {formatOptionDescription(model)}
+                </SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+          {landingaiOptions.length === 0 && (
+            <p className="mt-2 text-xs text-gray-500">
+              {pricingLoading
+                ? "Loading pricing..."
+                : pricingError || "Pricing data unavailable."}
+            </p>
+          )}
         </div>
       </div>
     </div>

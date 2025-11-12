@@ -229,9 +229,9 @@ export default function BattleDetailPage() {
 
             const cardClass = cn(
               "transition-all",
-              isThisWinner && "border-emerald-500 bg-emerald-50/60 dark:bg-emerald-950/20",
-              !isThisWinner && !isAllBad && battle.feedback && "border-red-400 bg-red-50/60 dark:bg-red-950/20",
-              isAllBad && "border-red-500 bg-red-50/60 dark:bg-red-950/20"
+              isThisWinner && "border-emerald-500",
+              !isThisWinner && !isAllBad && battle.feedback && "border-red-400",
+              isAllBad && "border-red-500"
             );
 
             const title = (

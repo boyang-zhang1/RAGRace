@@ -9,7 +9,7 @@ import { CostDisplay } from "@/components/parse/CostDisplay";
 import { BattleHistory } from "@/components/parse/BattleHistory";
 import { ModelSelectionCard } from "@/components/battle/ModelSelectionCard";
 import { Button } from "@/components/ui/button";
-import { Loader2, FileText, ShieldCheck } from "lucide-react";
+import { Loader2, FileText, Swords } from "lucide-react";
 import { apiClient } from "@/lib/api-client";
 import {
   type BattleMetadata,
@@ -17,6 +17,7 @@ import {
   type ProviderCost,
   type LlamaIndexConfig,
   type ReductoConfig,
+  type LandingAIConfig,
 } from "@/types/api";
 import { getProviderDisplayName } from "@/lib/providerMetadata";
 import { ProviderLabel } from "@/components/providers/ProviderLabel";
@@ -33,6 +34,7 @@ type FeedbackChoice = string | "BOTH_GOOD" | "BOTH_BAD";
 type BattleConfigSelection = {
   llamaindex: LlamaIndexConfig;
   reducto: ReductoConfig;
+  landingai: LandingAIConfig;
 };
 
 export default function BattlePage() {
@@ -78,6 +80,8 @@ export default function BattlePage() {
         ? configsForDisplay.llamaindex
         : provider === "reducto"
         ? configsForDisplay.reducto
+        : provider === "landingai"
+        ? configsForDisplay.landingai
         : undefined;
 
     if (!config) {
@@ -173,6 +177,7 @@ export default function BattlePage() {
       setBattleConfigs({
         llamaindex: { ...selectedConfigs.llamaindex },
         reducto: { ...selectedConfigs.reducto },
+        landingai: { ...selectedConfigs.landingai },
       });
       setPreferredLabels(null);
       setFeedbackChoice(null);
@@ -251,7 +256,7 @@ export default function BattlePage() {
     <div className="container mx-auto p-6 max-w-full px-8">
       <div className="mb-8 space-y-3">
         <div className="flex items-center gap-3">
-          <ShieldCheck className="h-8 w-8 text-blue-500" />
+          <Swords className="h-8 w-8 text-purple-500" />
           <div>
             <h1 className="text-3xl font-bold">Parse Battle</h1>
             <p className="text-gray-600 dark:text-gray-400">
@@ -383,12 +388,23 @@ export default function BattlePage() {
                   const isPreferred = isRevealed && (preferredLabels?.includes(label) ?? false);
                   const isAllBad = isRevealed && (preferredLabels?.length === 0);
                   const modelDisplayInfo = isRevealed ? getModelDisplayInfo(provider, cost) : null;
+
+                  // Pre-submission feedback visual
+                  const isChosenAsPreferred = !isRevealed && feedbackChoice === label;
+                  const isChosenAsNotPreferred = !isRevealed && feedbackChoice && feedbackChoice !== label && feedbackChoice !== "BOTH_GOOD" && feedbackChoice !== "BOTH_BAD";
+                  const isBothGood = !isRevealed && feedbackChoice === "BOTH_GOOD";
+                  const isBothBad = !isRevealed && feedbackChoice === "BOTH_BAD";
+
                   const cardClass = cn(
                     "transition-all",
-                    !isRevealed && "border-gray-200 dark:border-gray-800",
-                    isRevealed && isPreferred && "border-emerald-500 bg-emerald-50/60 dark:bg-emerald-950/20",
-                    isRevealed && !isPreferred && !isAllBad && "border-red-400 bg-red-50/60 dark:bg-red-950/20",
-                    isRevealed && isAllBad && "border-red-500 bg-red-50/60 dark:bg-red-950/20"
+                    // Before submission - show user's choice
+                    !isRevealed && !feedbackChoice && "border-gray-200 dark:border-gray-800",
+                    !isRevealed && (isChosenAsPreferred || isBothGood) && "border-emerald-500",
+                    !isRevealed && (isChosenAsNotPreferred || isBothBad) && "border-red-400",
+                    // After submission - show actual results
+                    isRevealed && isPreferred && "border-emerald-500",
+                    isRevealed && !isPreferred && !isAllBad && "border-red-400",
+                    isRevealed && isAllBad && "border-red-500"
                   );
 
                   const footer = isRevealed ? (

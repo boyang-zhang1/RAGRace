@@ -1,6 +1,7 @@
 import type {
   LlamaIndexConfig,
   ReductoConfig,
+  LandingAIConfig,
   ModelOption,
   ProviderPricingInfo,
 } from "@/types/api";
@@ -18,6 +19,10 @@ export function getDefaultBattleConfigs() {
       mode: "standard",
       summarize_figures: false,
     } as ReductoConfig,
+    landingai: {
+      mode: "dpt-2",
+      model: "dpt-2",
+    } as LandingAIConfig,
   };
 }
 
@@ -26,6 +31,10 @@ export function llamaIndexConfigToValue(config?: LlamaIndexConfig): string {
 }
 
 export function reductoConfigToValue(config?: ReductoConfig): string {
+  return config?.mode || "";
+}
+
+export function landingaiConfigToValue(config?: LandingAIConfig): string {
   return config?.mode || "";
 }
 
