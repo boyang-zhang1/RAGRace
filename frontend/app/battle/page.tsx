@@ -204,7 +204,7 @@ export default function BattlePage() {
           <div>
             <p className="font-semibold">How credits are used</p>
             <p>
-              We automatically run LlamaIndex Agentic (~10 credits/page) versus Reducto Standard (~1 credit/page) on the page you select.
+              We automatically run LlamaIndex Agentic ($0.010/page) versus Reducto Standard ($0.015/page) on the page you select.
             </p>
           </div>
         </div>
@@ -287,7 +287,7 @@ export default function BattlePage() {
                     onPageChange={setCurrentPage}
                   />
                   <p className="text-center text-sm text-gray-500">
-                    We will only parse the page you select to keep credit usage low.
+                    We will only parse the page you select to keep cost low.
                   </p>
                 </>
               )}
