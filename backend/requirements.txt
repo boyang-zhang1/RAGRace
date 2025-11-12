@@ -54,3 +54,6 @@ python-multipart>=0.0.20  # Required for file uploads
 
 # Database ORM
 prisma==0.11.0
+
+# Cloud Storage
+supabase>=2.0.0
