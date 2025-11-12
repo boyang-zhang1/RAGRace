@@ -172,7 +172,7 @@ export default function BattleDetailPage() {
           <CardContent className="p-6">
             <div className="flex justify-center bg-gray-100 dark:bg-gray-800 rounded-lg overflow-hidden">
               <iframe
-                src={`${process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000'}/api/v1/parse/battle-pdf/${battleId}`}
+                src={`${process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000'}/api/v1/parse/battle-pdf/${battleId}#navpanes=0&toolbar=0`}
                 className="w-full h-[700px] border-0"
                 title="Battle PDF (Single Page)"
               />

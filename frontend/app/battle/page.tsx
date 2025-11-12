@@ -302,18 +302,9 @@ export default function BattlePage() {
                 </p>
               )}
             </div>
-            <div className="flex flex-wrap gap-3">
-              <Button variant="outline" onClick={handleReset} disabled={isUploading || isParsing}>
-                Upload Another PDF
-              </Button>
-              <Button
-                onClick={handleRunBattle}
-                disabled={isParsing || isUploading || pageCount === null}
-              >
-                {isParsing && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
-                {battlePageNumber ? "Re-run Battle" : "Run Battle"}
-              </Button>
-            </div>
+            <Button variant="outline" onClick={handleReset} disabled={isUploading || isParsing}>
+              Upload Another PDF
+            </Button>
           </div>
 
           {isLoadingPageCount && (
@@ -342,9 +333,22 @@ export default function BattlePage() {
                     totalPages={pageCount}
                     onPageChange={setCurrentPage}
                   />
-                  <p className="text-center text-sm text-gray-500">
-                    We will only parse the page you select to keep cost low.
-                  </p>
+                  <div className="flex flex-col items-center gap-3">
+                    <Button
+                      onClick={handleRunBattle}
+                      disabled={isParsing || isUploading || pageCount === null}
+                      size="lg"
+                      className="w-full max-w-md"
+                    >
+                      {isParsing && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
+                      {battlePageNumber
+                        ? `Re-run Battle on Page ${currentPage}`
+                        : `Run Battle on Page ${currentPage} Only`}
+                    </Button>
+                    <p className="text-center text-xs text-gray-500">
+                      Only this page will be parsed to keep costs low
+                    </p>
+                  </div>
                 </>
               )}
             </div>
@@ -372,7 +376,7 @@ export default function BattlePage() {
               </div>
 
               <div className="grid gap-6 md:grid-cols-2 items-stretch">
-                {battleInfo.map(({ assignment, markdown, providerResult, cost }) => {
+                {battleInfo.map(({ assignment, markdown, cost }) => {
                   const label = assignment.label;
                   const provider = assignment.provider;
                   const displayName = getProviderDisplayName(provider);

@@ -116,15 +116,16 @@ async def _persist_battle_run(
     client = prisma_client
 
     storage_url: Optional[str] = None
-    supabase_path = f"{BATTLE_STORAGE_PREFIX}/{battle_id}.pdf"
+    # Construct Supabase storage path - this is our source of truth
+    supabase_storage_path = f"{BATTLE_STORAGE_PREFIX}/{battle_id}.pdf"
 
     try:
         storage_service = SupabaseStorageService()
-        storage_url = storage_service.upload(str(storage_input_path), supabase_path)
-        logger.info("Uploaded battle PDF to Supabase: %s", storage_url)
+        storage_url = storage_service.upload(str(storage_input_path), supabase_storage_path)
+        logger.info("Uploaded battle PDF to Supabase: %s (path: %s)", storage_url, supabase_storage_path)
     except Exception as exc:
         logger.error("Failed to upload battle PDF to Supabase: %s", exc)
-        raise ValueError(f"Failed to upload battle PDF to Supabase: {exc}")
+        raise RuntimeError(f"Battle PDF upload to storage failed: {exc}")
 
     try:
         pricing_config = load_pricing_config()
@@ -192,7 +193,7 @@ async def _persist_battle_run(
                 "id": battle_id,
                 "uploadFileId": upload_file_id,
                 "originalName": original_name,
-                "storagePath": supabase_path,
+                "storagePath": supabase_storage_path,
                 "storageUrl": storage_url,
                 "pageNumber": page_number,
                 "providers": providers,
@@ -850,6 +851,8 @@ async def get_battle_pdf(battle_id: str, db: Prisma = Depends(get_db)):
     """
     Get the single-page battle PDF file for viewing from Supabase storage.
 
+    Downloads from Supabase Storage and returns the PDF.
+
     Args:
         battle_id: UUID of the battle
 
@@ -864,28 +867,46 @@ async def get_battle_pdf(battle_id: str, db: Prisma = Depends(get_db)):
     if not battle:
         raise HTTPException(status_code=404, detail=f"Battle not found: {battle_id}")
 
-    # Download from Supabase storage
-    if not battle.storageUrl:
-        raise HTTPException(
-            status_code=404,
-            detail=f"Battle PDF storage URL not found for battle {battle_id}"
-        )
-
+    # Primary path: Download from Supabase Storage
     try:
         storage_service = SupabaseStorageService()
-        # Download the file from Supabase to a temporary location
-        temp_pdf = storage_service.download_to_temp(battle.storagePath)
+        logger.info(f"Downloading battle PDF from Supabase: {battle.storagePath}")
+        temp_pdf_path = storage_service.download_to_temp(battle.storagePath)
 
         return FileResponse(
-            temp_pdf,
+            temp_pdf_path,
             media_type="application/pdf",
             headers={"Content-Disposition": f"inline; filename=battle_{battle_id}_page_{battle.pageNumber}.pdf"},
         )
-    except Exception as exc:
-        logger.error(f"Failed to download battle PDF from Supabase: {exc}")
+    except Exception as e:
+        logger.error(f"Failed to download battle PDF from Supabase (path: {battle.storagePath}): {e}")
+
+        # Fallback: Try to find local file for backwards compatibility with old records
+        storage_path = Path(battle.storagePath)
+        if storage_path.exists() and storage_path.is_file():
+            logger.info(f"Found local battle PDF: {storage_path}")
+            return FileResponse(
+                storage_path,
+                media_type="application/pdf",
+                headers={"Content-Disposition": f"inline; filename=battle_{battle_id}_page_{battle.pageNumber}.pdf"},
+            )
+
+        # Last resort: Search for old battles using pattern {uploadFileId}_page_{pageNumber}_*.pdf
+        pattern = f"{battle.uploadFileId}_page_{battle.pageNumber}_*.pdf"
+        matching_files = list(TEMP_DIR.glob(pattern))
+
+        if matching_files:
+            pdf_path = matching_files[0]
+            logger.info(f"Found battle PDF via pattern match: {pdf_path}")
+            return FileResponse(
+                pdf_path,
+                media_type="application/pdf",
+                headers={"Content-Disposition": f"inline; filename=battle_{battle_id}_page_{battle.pageNumber}.pdf"},
+            )
+
         raise HTTPException(
             status_code=404,
-            detail=f"Failed to retrieve battle PDF from Supabase: {str(exc)}"
+            detail=f"Battle PDF not found. Storage path: {battle.storagePath}, Upload ID: {battle.uploadFileId}, Page: {battle.pageNumber}"
         )
 
 
