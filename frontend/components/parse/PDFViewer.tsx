@@ -84,7 +84,7 @@ export function PDFViewer({
         singlePagePdf.addPage(copiedPage);
 
         const pdfBytes = await singlePagePdf.save();
-        const blob = new Blob([pdfBytes], { type: "application/pdf" });
+        const blob = new Blob([new Uint8Array(pdfBytes)], { type: "application/pdf" });
         const blobUrl = URL.createObjectURL(blob);
         // Add Adobe PDF parameters to hide navigation panes and toolbar
         const url = `${blobUrl}#navpanes=0&toolbar=0`;
