@@ -661,13 +661,18 @@ async def compare_parsers(request: ParseCompareRequest, db: Prisma = Depends(get
             entry = _select_pricing_entry("landingai", provider_pricing, mode=mode, config=config)
             credits_per_page = entry.get("credits_per_page", 3.0) if entry else 3.0
 
-            # Get API key from environment
-            api_key = os.getenv("VISION_AGENT_API_KEY")
-            if not api_key:
+            # Get API key(s) from environment - supports comma-separated pool
+            api_key_str = os.getenv("VISION_AGENT_API_KEY")
+            if not api_key_str:
                 raise ValueError("VISION_AGENT_API_KEY not configured in backend environment")
 
+            # Parse comma-separated keys and strip whitespace
+            api_keys = [key.strip() for key in api_key_str.split(",") if key.strip()]
+            if not api_keys:
+                raise ValueError("VISION_AGENT_API_KEY is empty after parsing")
+
             parsers["landingai"] = LandingAIParser(
-                api_key=api_key,
+                api_keys=api_keys,
                 model=model,
                 credits_per_page=credits_per_page
             )

@@ -4,7 +4,7 @@ import os
 import re
 import time
 from pathlib import Path
-from typing import Dict, Any
+from typing import Dict, Any, List, Union
 from collections import defaultdict
 
 from landingai_ade import LandingAIADE
@@ -13,25 +13,62 @@ from .base import BaseParseAdapter, PageResult, ParseResult
 
 
 class LandingAIParser(BaseParseAdapter):
-    """Parser using LandingAI's Vision Agent API."""
+    """Parser using LandingAI's Vision Agent API with API key pool support."""
 
-    def __init__(self, api_key: str, model: str = "dpt-2", credits_per_page: float = 3.0):
+    def __init__(self, api_keys: Union[str, List[str]], model: str = "dpt-2", credits_per_page: float = 3.0):
         """
-        Initialize LandingAI parser.
+        Initialize LandingAI parser with API key pool support.
 
         Args:
-            api_key: API key for LandingAI (required).
+            api_keys: Single API key (str) or list of API keys for fallback.
+                      If one key fails due to quota/credit issues, the next key will be tried.
             model: LandingAI model to use (default: "dpt-2").
             credits_per_page: Credits per page for the selected model (default: 3.0).
 
         Raises:
-            ValueError: If api_key is empty or None.
+            ValueError: If api_keys is empty or None.
         """
-        if not api_key:
-            raise ValueError("LandingAI API key is required")
-        self.api_key = api_key
+        # Convert single key to list for uniform handling
+        if isinstance(api_keys, str):
+            self.api_keys = [api_keys] if api_keys else []
+        else:
+            self.api_keys = api_keys or []
+
+        if not self.api_keys:
+            raise ValueError("At least one LandingAI API key is required")
+
         self.model = model
         self.credits_per_page = credits_per_page
+        self.current_key_index = 0  # Track which key we're currently using
+
+    def _is_retryable_error(self, error: Exception) -> bool:
+        """
+        Check if an error is retryable (e.g., quota/credit/auth issues).
+
+        Args:
+            error: The exception to check
+
+        Returns:
+            True if the error indicates we should try the next API key
+        """
+        error_msg = str(error).lower()
+
+        # Common patterns for retryable errors (quota, credit, invalid/expired keys)
+        retryable_patterns = [
+            "quota",
+            "credit",
+            "rate limit",
+            "insufficient",
+            "exceeded",
+            "invalid",  # Invalid API key
+            "expired",  # Expired API key
+            "unauthorized",  # Auth failures
+            "401",  # HTTP 401 Unauthorized (invalid/expired key)
+            "429",  # HTTP 429 Too Many Requests
+            "402",  # HTTP 402 Payment Required
+        ]
+
+        return any(pattern in error_msg for pattern in retryable_patterns)
 
     def _normalize_markdown(self, markdown: str) -> str:
         """
@@ -107,23 +144,61 @@ class LandingAIParser(BaseParseAdapter):
     async def parse_pdf(self, pdf_path: Path) -> ParseResult:
         """
         Parse PDF using LandingAI with page-by-page splitting.
+        Automatically tries next API key in pool if current one fails due to quota/credit issues.
 
         Args:
             pdf_path: Path to the PDF file
 
         Returns:
             ParseResult with markdown content per page
+
+        Raises:
+            Exception: If all API keys fail or if a non-retryable error occurs
         """
         start_time = time.time()
+        last_error = None
 
-        # Initialize LandingAI client
-        client = LandingAIADE(apikey=self.api_key)
+        # Try each API key in sequence
+        for key_index, api_key in enumerate(self.api_keys):
+            try:
+                # Initialize LandingAI client with current key
+                client = LandingAIADE(apikey=api_key)
 
-        # Parse the PDF using configured model
-        parse_response = client.parse(
-            document=pdf_path,
-            model=self.model,
-        )
+                # Parse the PDF using configured model
+                parse_response = client.parse(
+                    document=pdf_path,
+                    model=self.model,
+                )
+
+                # If successful, update current key index and break
+                self.current_key_index = key_index
+                break
+
+            except Exception as e:
+                last_error = e
+                error_msg = str(e)
+
+                # Check if this is a retryable error
+                if self._is_retryable_error(e):
+                    # Try next key if available
+                    if key_index < len(self.api_keys) - 1:
+                        print(f"LandingAI API key {key_index + 1} failed: {error_msg}")
+                        print(f"  → Trying next API key ({key_index + 2}/{len(self.api_keys)})...")
+                        continue
+                    else:
+                        # No more keys to try
+                        raise Exception(
+                            f"All {len(self.api_keys)} LandingAI API keys exhausted. Last error: {error_msg}"
+                        ) from e
+                else:
+                    # Non-retryable error (e.g., network issue, malformed request)
+                    raise Exception(
+                        f"LandingAI API key {key_index + 1} failed with non-retryable error: {error_msg}"
+                    ) from e
+
+        # If we got here without a parse_response, something went wrong
+        if last_error and 'parse_response' not in locals():
+            raise last_error
 
         # Convert response to dict if it's not already
         if hasattr(parse_response, 'dict'):
