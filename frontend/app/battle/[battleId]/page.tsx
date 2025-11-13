@@ -13,7 +13,7 @@ import { cn } from "@/lib/utils";
 import { getProviderDisplayName } from "@/lib/providerMetadata";
 import { getDefaultBattleConfigs, getModelOptionForConfig, getFallbackLabel } from "@/lib/modelUtils";
 import { useProviderPricing } from "@/hooks/useProviderPricing";
-import type { BattleDetailResponse, LlamaIndexConfig, ReductoConfig } from "@/types/api";
+import type { BattleDetailResponse, LlamaIndexConfig, ReductoConfig, LandingAIConfig } from "@/types/api";
 
 export default function BattleDetailPage() {
   const params = useParams();
@@ -89,12 +89,14 @@ export default function BattleDetailPage() {
 
   const winnerStatus = getWinnerStatus();
   const pageNumber = battle.page_number;
-  const sortedProviders = [...battle.providers].sort((a, b) => a.label.localeCompare(b.label));
+  // Keep original left/right order from battle (no sorting)
+  const providers = battle.providers;
 
   // Extract model configs from metadata
   const modelConfigs = {
     llamaindex: getDefaultBattleConfigs().llamaindex,
     reducto: getDefaultBattleConfigs().reducto,
+    landingai: getDefaultBattleConfigs().landingai,
   };
 
   // Update configs from battle metadata
@@ -104,6 +106,9 @@ export default function BattleDetailPage() {
     }
     if (battle.provider_configs.reducto) {
       modelConfigs.reducto = battle.provider_configs.reducto as ReductoConfig;
+    }
+    if (battle.provider_configs.landingai) {
+      modelConfigs.landingai = battle.provider_configs.landingai as LandingAIConfig;
     }
   }
 
@@ -199,7 +204,7 @@ export default function BattleDetailPage() {
       <div>
         <h2 className="text-2xl font-semibold mb-4">Battle Results</h2>
         <div className="grid gap-6 md:grid-cols-2 items-start">
-          {sortedProviders.map((provider) => {
+          {providers.map((provider) => {
             const assignment = battle.assignments.find((a) => a.label === provider.label);
             const isThisWinner = isWinner(provider.label);
             const isAllBad = winnerStatus === "both_bad";
@@ -222,6 +227,12 @@ export default function BattleDetailPage() {
             } else if (providerName === "reducto" && modelConfigs.reducto) {
               const option = getModelOptionForConfig("reducto", modelConfigs.reducto, pricingMap);
               modelDisplayName = option?.label || getFallbackLabel("reducto");
+              if (option) {
+                modelPricing = `$${option.usd_per_page.toFixed(3)}/page`;
+              }
+            } else if (providerName === "landingai" && modelConfigs.landingai) {
+              const option = getModelOptionForConfig("landingai", modelConfigs.landingai, pricingMap);
+              modelDisplayName = option?.label || getFallbackLabel("landingai");
               if (option) {
                 modelPricing = `$${option.usd_per_page.toFixed(3)}/page`;
               }

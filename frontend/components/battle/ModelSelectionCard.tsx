@@ -1,5 +1,6 @@
 "use client";
 
+import { useState, useEffect } from "react";
 import { LlamaIndexConfig, ReductoConfig, LandingAIConfig } from "@/types/api";
 import {
   ProviderPricingMap,
@@ -9,6 +10,9 @@ import {
   getModelOptionForConfig,
   formatOptionDescription,
   getFallbackLabel,
+  PresetMode,
+  detectPresetFromConfigs,
+  getConfigsForPreset,
 } from "@/lib/modelUtils";
 import {
   Select,
@@ -17,6 +21,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
+import { Switch } from "@/components/ui/switch";
 import { ProviderLabel } from "@/components/providers/ProviderLabel";
 
 interface ModelSelectionCardProps {
@@ -44,6 +49,27 @@ export function ModelSelectionCard({
   pricingLoading = false,
   pricingError = null,
 }: ModelSelectionCardProps) {
+  // Track the current preset mode (standard, advance, or custom)
+  const [presetMode, setPresetMode] = useState<PresetMode>("standard");
+
+  // Detect which preset (if any) matches the current configs
+  useEffect(() => {
+    const detectedPreset = detectPresetFromConfigs(selectedConfigs);
+    setPresetMode(detectedPreset);
+  }, [selectedConfigs]);
+
+  // Handle toggle change between standard and advance
+  const handlePresetToggle = (checked: boolean) => {
+    if (readOnly || !onConfigChange || !pricing) return;
+
+    const newPreset = checked ? "advance" : "standard";
+    const newConfigs = getConfigsForPreset(newPreset, pricing);
+
+    if (newConfigs) {
+      onConfigChange(newConfigs);
+    }
+  };
+
   const handleLlamaIndexChange = (value: string) => {
     if (readOnly || !onConfigChange) return;
     const option = pricing?.llamaindex?.models.find((model) => model.value === value);
@@ -76,7 +102,7 @@ export function ModelSelectionCard({
 
   if (!pricing) {
     return (
-      <div className="rounded-xl border border-purple-200 bg-purple-50/70 dark:border-purple-900/50 dark:bg-purple-950/30 p-4">
+      <div className="rounded-xl border border-purple-200 bg-purple-50/70 dark:border-purple-900/50 dark:bg-purple-950/30 px-4 pt-2 pb-4">
         <h3 className="text-sm font-semibold text-purple-900 dark:text-purple-100 mb-3">
           {readOnly ? "Models used in this battle" : "Model Selection"}
         </h3>
@@ -110,10 +136,47 @@ export function ModelSelectionCard({
   );
 
   return (
-    <div className="rounded-xl border border-purple-200 bg-purple-50/70 dark:border-purple-900/50 dark:bg-purple-950/30 p-4">
-      <h3 className="text-sm font-semibold text-purple-900 dark:text-purple-100 mb-3">
-        {readOnly ? "Models used in this battle" : "Model Selection"}
-      </h3>
+    <div className="rounded-xl border border-purple-200 bg-purple-50/70 dark:border-purple-900/50 dark:bg-purple-950/30 px-4 pt-2 pb-4">
+      <div className="flex items-center justify-between mb-3">
+        <h3 className="text-sm font-semibold text-purple-900 dark:text-purple-100">
+          {readOnly ? "Models used in this battle" : "Model Selection"}
+        </h3>
+
+        {/* Preset toggle - only show in edit mode */}
+        {!readOnly && (
+          <div className="flex items-center gap-3">
+            {presetMode === "custom" && (
+              <span className="text-sm text-purple-600 dark:text-purple-400 font-medium">
+                (Custom)
+              </span>
+            )}
+            <div className="inline-flex rounded-lg border border-gray-300 dark:border-gray-600 bg-gray-100 dark:bg-gray-800 p-1">
+              <button
+                onClick={() => handlePresetToggle(false)}
+                disabled={!pricing}
+                className={`px-4 py-1.5 text-sm font-medium rounded-md transition-all ${
+                  presetMode === "standard"
+                    ? "bg-white dark:bg-gray-700 text-purple-600 dark:text-purple-400 shadow-sm"
+                    : "text-gray-600 dark:text-gray-400 hover:text-gray-800 dark:hover:text-gray-200"
+                }`}
+              >
+                Standard
+              </button>
+              <button
+                onClick={() => handlePresetToggle(true)}
+                disabled={!pricing}
+                className={`px-4 py-1.5 text-sm font-medium rounded-md transition-all ${
+                  presetMode === "advance"
+                    ? "bg-white dark:bg-gray-700 text-purple-600 dark:text-purple-400 shadow-sm"
+                    : "text-gray-600 dark:text-gray-400 hover:text-gray-800 dark:hover:text-gray-200"
+                }`}
+              >
+                Advance
+              </button>
+            </div>
+          </div>
+        )}
+      </div>
 
       <div className="grid grid-cols-3 gap-6">
         {/* LlamaIndex Column */}

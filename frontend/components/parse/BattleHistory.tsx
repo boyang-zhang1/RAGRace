@@ -87,16 +87,9 @@ export function BattleHistory({ pricing }: BattleHistoryProps) {
 
   const renderModelInfo = (battle: BattleHistoryItem) => {
     const modelNames = battle.model_display_names || {};
-    const preferredOrder = ["llamaindex", "reducto"];
 
-    const orderedProviders = [
-      ...preferredOrder.filter((provider) => provider in modelNames),
-      ...Object.keys(modelNames).filter((provider) => !preferredOrder.includes(provider)),
-    ];
-
-    if (orderedProviders.length === 0) {
-      orderedProviders.push(...preferredOrder);
-    }
+    // Use original left/right order (backend now preserves order in model_display_names)
+    const orderedProviders = Object.keys(modelNames);
 
     const entries = orderedProviders.map((provider) => {
       const label = modelNames[provider] || getFallbackLabel(provider);

@@ -62,3 +62,10 @@ landingai:
       description: "Default LandingAI parsing"
       api:
         model: "dpt-2"
+
+    - mode: "dpt-2-mini"
+      label: "DPT-2 Mini"
+      credits_per_page: 1.5
+      description: "Cost-effective LandingAI parsing"
+      api:
+        model: "dpt-2-mini"

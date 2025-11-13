@@ -52,7 +52,7 @@ router = APIRouter(prefix="/parse", tags=["parsing"])
 TEMP_DIR = Path("data/temp")
 TEMP_DIR.mkdir(parents=True, exist_ok=True)
 
-DEFAULT_BATTLE_PROVIDERS = ["llamaindex", "reducto"]
+ALL_PARSING_PROVIDERS = ["llamaindex", "reducto", "landingai"]
 DEFAULT_PROVIDER_CONFIGS: Dict[str, Dict[str, Any]] = {
     "llamaindex": {"mode": "agentic"},
     "reducto": {"mode": "standard"},
@@ -78,6 +78,11 @@ def _extract_single_page(pdf_path: Path, page_number: int) -> Path:
         writer.write(f)
 
     return output_path
+
+
+def _select_battle_providers() -> List[str]:
+    """Randomly select 2 providers from all available providers for battle mode."""
+    return random.sample(ALL_PARSING_PROVIDERS, 2)
 
 
 def _prepare_battle_assignments(providers: List[str]) -> (List[BattleAssignment], Dict[str, str]):
@@ -574,7 +579,7 @@ async def compare_parsers(request: ParseCompareRequest, db: Prisma = Depends(get
     # Determine providers
     requested_providers = request.providers or []
     battle_mode = len(requested_providers) == 0
-    providers = requested_providers or DEFAULT_BATTLE_PROVIDERS.copy()
+    providers = requested_providers or _select_battle_providers()
     providers = list(dict.fromkeys(providers))  # Deduplicate while preserving order
 
     if battle_mode and request.page_number is None:
@@ -645,13 +650,32 @@ async def compare_parsers(request: ParseCompareRequest, db: Prisma = Depends(get
             )
 
         if "landingai" in providers:
-            # Get API key from environment
-            api_key = os.getenv("VISION_AGENT_API_KEY")
-            if not api_key:
+            config = resolved_configs.get("landingai")
+            if not config:
+                config = _resolve_provider_config("landingai", DEFAULT_PROVIDER_CONFIGS.get("landingai"), pricing_config)
+            model = config.get("model", "dpt-2")
+
+            # Get credits_per_page from pricing entry
+            provider_pricing = pricing_config.get("landingai", {})
+            mode = config.get("mode")
+            entry = _select_pricing_entry("landingai", provider_pricing, mode=mode, config=config)
+            credits_per_page = entry.get("credits_per_page", 3.0) if entry else 3.0
+
+            # Get API key(s) from environment - supports comma-separated pool
+            api_key_str = os.getenv("VISION_AGENT_API_KEY")
+            if not api_key_str:
                 raise ValueError("VISION_AGENT_API_KEY not configured in backend environment")
 
-            # LandingAI has no configurable options yet
-            parsers["landingai"] = LandingAIParser(api_key=api_key)
+            # Parse comma-separated keys and strip whitespace
+            api_keys = [key.strip() for key in api_key_str.split(",") if key.strip()]
+            if not api_keys:
+                raise ValueError("VISION_AGENT_API_KEY is empty after parsing")
+
+            parsers["landingai"] = LandingAIParser(
+                api_keys=api_keys,
+                model=model,
+                credits_per_page=credits_per_page
+            )
 
     except ValueError as e:
         raise HTTPException(
@@ -1050,12 +1074,23 @@ async def get_battle_history(
         provider_results = {result.provider: result for result in (battle.providerResults or [])}
         metadata_updated = False
 
-        providers = battle.providers or []
-        provider_keys = set(providers)
-        provider_keys.update(configs.keys())
+        # Get label-to-provider mapping to preserve original left/right order (A=left, B=right)
+        label_to_provider = metadata.get("label_providers") or {}
+
+        # Sort providers by their battle labels (A, B, C, D) to get true left-to-right order
+        providers_with_labels = [(label, provider) for label, provider in label_to_provider.items()]
+        providers_with_labels.sort(key=lambda x: x[0])  # Sort by label (A, B, C, D)
+        provider_keys = [provider for _, provider in providers_with_labels]
+
+        # Add any providers from configs or battle.providers that aren't in the label mapping
+        all_providers = set(battle.providers or [])
+        all_providers.update(configs.keys())
+        for provider in all_providers:
+            if provider not in provider_keys:
+                provider_keys.append(provider)
 
         if not provider_keys:
-            provider_keys.update(DEFAULT_BATTLE_PROVIDERS)
+            provider_keys = list(DEFAULT_BATTLE_PROVIDERS)
 
         for provider in provider_keys:
             provider_pricing = pricing_config.get(provider, {})
