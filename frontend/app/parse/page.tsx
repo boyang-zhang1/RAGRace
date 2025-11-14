@@ -11,6 +11,7 @@ import { ProcessingTimeDisplay } from "@/components/parse/ProcessingTimeDisplay"
 import { PageNavigator } from "@/components/parse/PageNavigator";
 import { ProviderLabel } from "@/components/providers/ProviderLabel";
 import { Button } from "@/components/ui/button";
+import { ContactIcons } from "@/components/ui/ContactIcons";
 import { FileText, Loader2 } from "lucide-react";
 import { apiClient } from "@/lib/api-client";
 import { getProviderDisplayName } from "@/lib/providerMetadata";
@@ -345,6 +346,8 @@ export default function ParsePage() {
           ) : null}
         </div>
       )}
+
+      <ContactIcons />
     </div>
   );
 }

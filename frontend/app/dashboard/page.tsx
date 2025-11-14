@@ -11,6 +11,7 @@ import { LoadingOverlay } from '@/components/LoadingOverlay';
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { AlertTriangle, Info, CheckCircle2 } from 'lucide-react';
+import { ContactIcons } from '@/components/ui/ContactIcons';
 
 export default function DashboardPage() {
   const [isRunning, setIsRunning] = useState(false);
@@ -111,6 +112,8 @@ export default function DashboardPage() {
           </ul>
         </div>
       </div>
+
+      <ContactIcons />
     </div>
   );
 }

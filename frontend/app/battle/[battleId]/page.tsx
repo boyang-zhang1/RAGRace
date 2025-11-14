@@ -13,6 +13,7 @@ import { cn } from "@/lib/utils";
 import { getProviderDisplayName } from "@/lib/providerMetadata";
 import { getDefaultBattleConfigs, getModelOptionForConfig, getFallbackLabel } from "@/lib/modelUtils";
 import { useProviderPricing } from "@/hooks/useProviderPricing";
+import { ContactIcons } from "@/components/ui/ContactIcons";
 import type { BattleDetailResponse, LlamaIndexConfig, ReductoConfig, LandingAIConfig } from "@/types/api";
 
 export default function BattleDetailPage() {
@@ -291,6 +292,8 @@ export default function BattleDetailPage() {
           })}
         </div>
       </div>
+
+      <ContactIcons />
     </div>
   );
 }

@@ -5,6 +5,7 @@ import { Card, CardDescription, CardHeader, CardTitle } from '@/components/ui/ca
 import { Badge } from '@/components/ui/badge';
 import { ResultsTable } from '@/components/results/ResultsTable';
 import { Skeleton } from '@/components/ui/skeleton';
+import { ContactIcons } from '@/components/ui/ContactIcons';
 
 async function DatasetsList() {
   try {
@@ -126,6 +127,8 @@ export default function DatasetsPage() {
           <ResultsList />
         </Suspense>
       </div>
+
+      <ContactIcons />
     </div>
   );
 }

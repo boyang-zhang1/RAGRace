@@ -6,6 +6,7 @@ import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { ArrowLeft, FileText } from 'lucide-react';
 import type { ProviderDetailResponse } from '@/types/api';
+import { ContactIcons } from '@/components/ui/ContactIcons';
 
 interface PageProps {
   params: Promise<{
@@ -166,6 +167,8 @@ export default async function ProviderDetailPage({ params }: PageProps) {
           </div>
         </CardContent>
       </Card>
+
+      <ContactIcons />
     </div>
   );
 }

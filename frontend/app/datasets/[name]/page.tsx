@@ -9,6 +9,7 @@ import { ProviderLabel } from '@/components/providers/ProviderLabel';
 import { Card, CardContent } from '@/components/ui/card';
 import { Skeleton } from '@/components/ui/skeleton';
 import { ArrowLeft } from 'lucide-react';
+import { ContactIcons } from '@/components/ui/ContactIcons';
 
 interface PageProps {
   params: Promise<{ name: string }>;
@@ -180,8 +181,11 @@ export default async function DatasetDetailPage({ params }: PageProps) {
   const { name } = await params;
 
   return (
-    <Suspense fallback={<DatasetDetailLoading />}>
-      <DatasetDetailContent datasetName={name} />
-    </Suspense>
+    <>
+      <Suspense fallback={<DatasetDetailLoading />}>
+        <DatasetDetailContent datasetName={name} />
+      </Suspense>
+      <ContactIcons />
+    </>
   );
 }

@@ -10,6 +10,7 @@ import { ProviderLabel } from '@/components/providers/ProviderLabel';
 import { Card, CardContent } from '@/components/ui/card';
 import { Skeleton } from '@/components/ui/skeleton';
 import { ArrowLeft } from 'lucide-react';
+import { ContactIcons } from '@/components/ui/ContactIcons';
 
 interface PageProps {
   params: Promise<{ run_id: string }>;
@@ -202,8 +203,11 @@ export default async function RunDetailPage({ params }: PageProps) {
   const { run_id } = await params;
 
   return (
-    <Suspense fallback={<RunDetailLoading />}>
-      <RunDetailContent runId={run_id} />
-    </Suspense>
+    <>
+      <Suspense fallback={<RunDetailLoading />}>
+        <RunDetailContent runId={run_id} />
+      </Suspense>
+      <ContactIcons />
+    </>
   );
 }

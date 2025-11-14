@@ -2,6 +2,7 @@ import { Suspense } from 'react';
 import { apiClient } from '@/lib/api-client';
 import { ResultsTable } from '@/components/results/ResultsTable';
 import { Skeleton } from '@/components/ui/skeleton';
+import { ContactIcons } from '@/components/ui/ContactIcons';
 
 async function ResultsList() {
   try {
@@ -63,8 +64,11 @@ function ResultsLoading() {
 
 export default function ResultsPage() {
   return (
-    <Suspense fallback={<ResultsLoading />}>
-      <ResultsList />
-    </Suspense>
+    <>
+      <Suspense fallback={<ResultsLoading />}>
+        <ResultsList />
+      </Suspense>
+      <ContactIcons />
+    </>
   );
 }

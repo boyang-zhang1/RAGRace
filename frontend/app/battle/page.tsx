@@ -8,7 +8,9 @@ import { MarkdownViewer } from "@/components/parse/MarkdownViewer";
 import { CostDisplay } from "@/components/parse/CostDisplay";
 import { BattleHistory } from "@/components/parse/BattleHistory";
 import { ModelSelectionCard } from "@/components/battle/ModelSelectionCard";
+import { BattleCharacters } from "@/components/battle/BattleCharacters";
 import { Button } from "@/components/ui/button";
+import { ContactIcons } from "@/components/ui/ContactIcons";
 import { Loader2, FileText, Swords } from "lucide-react";
 import { apiClient } from "@/lib/api-client";
 import {
@@ -364,9 +366,15 @@ export default function BattlePage() {
           )}
 
           {isParsing && (
-            <div className="rounded-xl border border-blue-200 bg-blue-50 p-6 text-center text-blue-700 dark:border-blue-900 dark:bg-blue-950/30 dark:text-blue-100">
-              <Loader2 className="mx-auto mb-4 h-8 w-8 animate-spin" />
-              Running both providers on page {currentPage}...
+            <div className="space-y-4">
+              {/* Show fighting robots during parsing */}
+              <BattleCharacters
+                isParsing={isParsing}
+                isRevealed={false}
+                feedbackChoice={null}
+                assignments={assignments.length > 0 ? assignments : []}
+                preferredLabels={null}
+              />
             </div>
           )}
 
@@ -459,6 +467,15 @@ export default function BattlePage() {
                   );
                 })}
               </div>
+
+              {/* Battle Characters Animation - positioned between results and verdict */}
+              <BattleCharacters
+                isParsing={isParsing}
+                isRevealed={isRevealed}
+                feedbackChoice={feedbackChoice}
+                assignments={assignments}
+                preferredLabels={preferredLabels}
+              />
             </div>
           )}
 
@@ -554,7 +571,7 @@ export default function BattlePage() {
 
               {feedbackSuccess && (
                 <div className="rounded-md border border-emerald-200 bg-emerald-50 p-3 text-sm text-emerald-700">
-                  Feedback saved. Providers revealed!
+                  Thanks for your Feedback! Providers revealed!
                 </div>
               )}
 
@@ -580,6 +597,8 @@ export default function BattlePage() {
       <div className="mt-16">
         <BattleHistory pricing={pricingMap} />
       </div>
+
+      <ContactIcons />
     </div>
   );
 }

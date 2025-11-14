@@ -1,15 +1,59 @@
 "use client";
 
+import { useEffect, useRef, useState } from "react";
 import type { ReactNode } from "react";
 import ReactMarkdown, { type Components } from "react-markdown";
 import remarkGfm from "remark-gfm";
 import remarkMath from "remark-math";
 import rehypeRaw from "rehype-raw";
 import rehypeKatex from "rehype-katex";
-import rehypeMermaid from "rehype-mermaid";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { cn } from "@/lib/utils";
 import "katex/dist/katex.min.css";
+
+// Helper to generate unique IDs for mermaid diagrams
+const generateId = () => `mermaid-${Math.random().toString(36).substr(2, 9)}`;
+
+// Component to render Mermaid diagrams client-side
+function MermaidRenderer({ code }: { code: string }) {
+  const [svg, setSvg] = useState<string>("");
+  const [error, setError] = useState<string>("");
+  const id = useRef(generateId());
+
+  useEffect(() => {
+    const renderDiagram = async () => {
+      try {
+        const mermaid = (await import("mermaid")).default;
+        mermaid.initialize({
+          startOnLoad: false,
+          theme: "default",
+          securityLevel: "loose",
+        });
+
+        const { svg } = await mermaid.render(id.current, code);
+        setSvg(svg);
+      } catch (err) {
+        setError(err instanceof Error ? err.message : String(err));
+      }
+    };
+
+    renderDiagram();
+  }, [code]);
+
+  if (error) {
+    return (
+      <div className="bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800 rounded p-4 text-red-800 dark:text-red-300">
+        <strong>Mermaid Error:</strong> {error}
+      </div>
+    );
+  }
+
+  if (!svg) {
+    return <div className="text-gray-400 p-4">Rendering diagram...</div>;
+  }
+
+  return <div dangerouslySetInnerHTML={{ __html: svg }} />;
+}
 
 interface MarkdownViewerProps {
   title: ReactNode;
@@ -37,6 +81,24 @@ export function MarkdownViewer({
     : undefined;
 
   const markdownComponents: Components = {
+    // Custom pre styling - remove frame for mermaid diagrams
+    pre: ({ node, children, ...props }) => {
+      // Check if this pre contains a mermaid code block
+      const child = children as any;
+      const isMermaid = child?.props?.className?.includes('language-mermaid');
+
+      if (isMermaid) {
+        // No frame for mermaid - just render children
+        return <div className="my-4">{children}</div>;
+      }
+
+      // Default pre styling for other code blocks
+      return (
+        <pre className="bg-gray-100 dark:bg-gray-800 rounded p-4 overflow-x-auto" {...props}>
+          {children}
+        </pre>
+      );
+    },
     // Custom heading styling
     h1: ({ node, ...props }) => (
       <h1 className="text-2xl font-bold mt-6 mb-4" {...props} />
@@ -78,18 +140,34 @@ export function MarkdownViewer({
       />
     ),
     // Custom code block styling
-    code: ({ inline, ...props }: { inline?: boolean } & React.HTMLAttributes<HTMLElement>) =>
-      inline ? (
+    code: ({ inline, className, children, ...props }: { inline?: boolean; className?: string } & React.HTMLAttributes<HTMLElement>) => {
+      // Detect mermaid code blocks
+      const match = /language-(\w+)/.exec(className || "");
+      const language = match?.[1];
+      const code = String(children).replace(/\n$/, "");
+
+      // Render mermaid diagrams with custom component
+      if (!inline && language === "mermaid") {
+        return <MermaidRenderer code={code} />;
+      }
+
+      // Regular code rendering
+      return inline ? (
         <code
           className="px-1 py-0.5 bg-gray-100 dark:bg-gray-800 rounded text-sm"
           {...props}
-        />
+        >
+          {children}
+        </code>
       ) : (
         <code
           className="block p-2 bg-gray-100 dark:bg-gray-800 rounded text-sm overflow-x-auto"
           {...props}
-        />
-      ),
+        >
+          {children}
+        </code>
+      );
+    },
   };
 
   return (
@@ -110,7 +188,7 @@ export function MarkdownViewer({
             <div className="prose dark:prose-invert max-w-none prose-lg prose-headings:font-bold prose-h1:text-3xl prose-h2:text-2xl prose-h3:text-xl text-[17px] leading-relaxed">
               <ReactMarkdown
                 remarkPlugins={[remarkGfm, remarkMath]}
-                rehypePlugins={[rehypeKatex, rehypeMermaid, rehypeRaw]}
+                rehypePlugins={[rehypeKatex, rehypeRaw]}
                 components={markdownComponents}
               >
                 {processedMarkdown}
