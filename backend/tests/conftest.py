@@ -1,5 +1,5 @@
 """
-Pytest configuration for RAGRace tests.
+Pytest configuration for DocAgent-Arena tests.
 
 Loads environment variables from backend/.env file before running tests.
 """

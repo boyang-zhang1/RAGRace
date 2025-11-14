@@ -1,5 +1,5 @@
 /**
- * API client for RAGRace backend
+ * API client for DocAgent Arena backend
  */
 
 import type {

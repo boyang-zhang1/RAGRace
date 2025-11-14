@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """
-RAGRace Benchmark Runner - CLI Script
+DocAgent-Arena Benchmark Runner - CLI Script
 
 Run RAG provider benchmarks from the command line.
 
@@ -53,7 +53,7 @@ from src.core.orchestrator import Orchestrator
 def parse_args():
     """Parse command-line arguments."""
     parser = argparse.ArgumentParser(
-        description="Run RAGRace benchmark to compare RAG providers",
+        description="Run DocAgent-Arena benchmark to compare RAG providers",
         formatter_class=argparse.RawDescriptionHelpFormatter,
         epilog=__doc__
     )
@@ -182,7 +182,7 @@ def main():
     args = parse_args()
 
     print("="*80)
-    print("RAGRace Benchmark Runner")
+    print("DocAgent-Arena Benchmark Runner")
     print("="*80)
 
     # Confirm .env loaded

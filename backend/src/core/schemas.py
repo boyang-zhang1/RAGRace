@@ -1,5 +1,5 @@
 """
-Data schemas for RAGRace benchmark.
+Data schemas for DocAgent-Arena benchmark.
 
 All data structures are dataclasses for:
 - Type safety

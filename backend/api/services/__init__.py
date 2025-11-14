@@ -1,1 +1,1 @@
-"""API services for RAGRace backend."""
+"""API services for DocAgent-Arena backend."""

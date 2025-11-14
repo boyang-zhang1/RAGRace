@@ -1,5 +1,5 @@
 """
-Orchestrator - main entry point for RAGRace benchmark.
+Orchestrator - main entry point for DocAgent-Arena benchmark.
 
 Coordinates:
 - Configuration loading
@@ -29,7 +29,7 @@ from src.core.db_writer import DbWriter
 
 
 class Orchestrator:
-    """Main orchestrator for RAGRace benchmark."""
+    """Main orchestrator for DocAgent-Arena benchmark."""
 
     def __init__(self, config_path: str):
         """
@@ -131,7 +131,7 @@ class Orchestrator:
         start_time = time.time()
 
         print("\n" + "="*80)
-        print("🏁 RAGRACE BENCHMARK (Parallel Execution)")
+        print("🏁 DocAgent-Arena BENCHMARK (Parallel Execution)")
         print("="*80)
         print(f"Config: {self.config_path}")
         print(f"Dataset: {self.dataset_config['name']}")

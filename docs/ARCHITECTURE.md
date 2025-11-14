@@ -1,8 +1,8 @@
-# RAGRace Architecture
+# DocAgent-Arena Architecture
 
 ## System Overview
 
-RAGRace consists of three main layers:
+DocAgent-Arena consists of three main layers:
 1. **Backend (Python)** - Benchmark orchestration engine + PDF parsing system + FastAPI REST API
 2. **Frontend (TypeScript/React)** - Next.js web interface for browsing results and comparing PDF parsing
 3. **Database (PostgreSQL)** - Supabase with Prisma ORM for persistent storage

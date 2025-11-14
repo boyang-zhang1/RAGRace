@@ -122,7 +122,7 @@ class LlamaIndexAdapter(BaseAdapter):
         if not documents:
             raise ValueError("Documents list cannot be empty")
 
-        # Convert RAGRace documents to LlamaIndex documents
+        # Convert DocAgent-Arena documents to LlamaIndex documents
         llama_docs = []
         for doc in documents:
             # STRICT: Only process PDF files (no silent fallback to text)

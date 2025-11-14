@@ -1,4 +1,4 @@
-"""Utility functions for RAGRace."""
+"""Utility functions for DocAgent-Arena."""
 
 from .pdf_generator import text_to_pdf, squad_context_to_pdf
 from .cost_tracker import (

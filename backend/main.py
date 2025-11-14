@@ -1,4 +1,4 @@
-"""FastAPI application entry point for RAGRace API."""
+"""FastAPI application entry point for DocAgent Arena API."""
 
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
@@ -7,7 +7,7 @@ from api.routers import results, benchmarks, parsing
 
 # Initialize FastAPI app
 app = FastAPI(
-    title="RAGRace API",
+    title="DocAgent Arena API",
     version="1.0.0",
     description="API for browsing and triggering RAG benchmark results",
     lifespan=lifespan,  # Connect/disconnect Prisma on startup/shutdown
@@ -31,14 +31,14 @@ app.include_router(parsing.router, prefix="/api/v1", tags=["parsing"])
 @app.get("/api/health")
 async def health_check():
     """Health check endpoint."""
-    return {"status": "ok", "service": "ragrace-api"}
+    return {"status": "ok", "service": "docagent-arena-api"}
 
 
 @app.get("/")
 async def root():
     """Root endpoint with API information."""
     return {
-        "service": "RAGRace API",
+        "service": "DocAgent Arena API",
         "version": "1.0.0",
         "docs": "/docs",
         "health": "/api/health",

@@ -30,7 +30,7 @@ export function Navbar() {
         <div className="flex items-center justify-between">
           {/* Logo / Brand */}
           <Link href="/battle" className="text-2xl font-bold">
-            RAGRace
+            DocAgent Arena
           </Link>
 
           {/* Navigation Links */}

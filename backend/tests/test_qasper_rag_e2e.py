@@ -1,7 +1,7 @@
 """
-End-to-end RAGRace test with Qasper dataset.
+End-to-end DocAgent-Arena test with Qasper dataset.
 
-Complete RAGRace workflow - Fair 3-way comparison:
+Complete DocAgent-Arena workflow - Fair 3-way comparison:
 1. Load Qasper document (original PDF from arxiv + questions with ground truth)
 2. Upload SAME PDF to ALL 3 RAG providers (LlamaIndex, LandingAI, Reducto)
 3. Query ALL 3 providers with SAME questions
@@ -43,7 +43,7 @@ from src.adapters.base import Document
 
 @pytest.mark.integration
 class TestQasperRAGRace:
-    """Integration test: Complete RAGRace on Qasper documents."""
+    """Integration test: Complete DocAgent-Arena on Qasper documents."""
 
     @pytest.fixture
     def openai_api_key(self):
@@ -96,7 +96,7 @@ class TestQasperRAGRace:
         ragas_evaluator
     ):
         """
-        Complete RAGRace: 3 providers compete on same Qasper document.
+        Complete DocAgent-Arena: 3 providers compete on same Qasper document.
 
         Workflow:
         1. Load 1 document, 3 questions from Qasper
@@ -116,10 +116,10 @@ class TestQasperRAGRace:
         rag_logger = RAGLogger(log_dir="data/results", test_name="qasper_ragrace")
 
         print("\n" + "=" * 80)
-        print("🏁 RAGRACE: 3-WAY PROVIDER COMPARISON ON QASPER")
+        print("🏁 DocAgent-Arena: 3-WAY PROVIDER COMPARISON ON QASPER")
         print("=" * 80)
 
-        rag_logger.log_section("RAGRACE: 3-WAY PROVIDER COMPARISON ON QASPER")
+        rag_logger.log_section("DocAgent-Arena: 3-WAY PROVIDER COMPARISON ON QASPER")
         rag_logger.log(f"Configuration: {max_docs} documents, {max_questions} questions per document")
         rag_logger.log("")
 
@@ -322,7 +322,7 @@ class TestQasperRAGRace:
 
         # Step 6: Compare and declare winner
         print("\n" + "=" * 80)
-        print("🏆 RAGRACE RESULTS - PROVIDER COMPARISON")
+        print("🏆 DocAgent-Arena RESULTS - PROVIDER COMPARISON")
         print("=" * 80)
 
         # Compare by each metric
@@ -367,7 +367,7 @@ class TestQasperRAGRace:
         # No cleanup needed - using original PDF from arxiv
 
         print("\n" + "=" * 80)
-        print("✅ RAGRACE COMPLETE!")
+        print("✅ DocAgent-Arena COMPLETE!")
         print(f"   Tested: {len(docs_to_test)} documents, {total_questions} questions")
         print("=" * 80)
 
@@ -386,7 +386,7 @@ class TestQasperRAGRace:
 
 if __name__ == "__main__":
     """
-    Run the RAGRace:
+    Run the DocAgent-Arena:
 
     pytest tests/test_qasper_rag_e2e.py::TestQasperRAGRace::test_ragrace_3_providers_qasper -v -s -m integration
     """

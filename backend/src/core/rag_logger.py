@@ -1,5 +1,5 @@
 """
-RAG Logger - Comprehensive file logging for RAGRace tests.
+RAG Logger - Comprehensive file logging for DocAgent-Arena tests.
 
 Logs all RAG operations to file for debugging and analysis:
 - Document metadata (PDF name, path, size, title)
@@ -28,7 +28,7 @@ class RAGLogger:
     - Thread-safe logging (uses threading.Lock)
     """
 
-    def __init__(self, log_dir: str = "data/results", test_name: str = "ragrace"):
+    def __init__(self, log_dir: str = "data/results", test_name: str = "DocAgent-Arena"):
         """
         Initialize RAG logger.
 
@@ -64,7 +64,7 @@ class RAGLogger:
         self.logger.addHandler(file_handler)
 
         # Write header
-        self.log_section("RAGRACE TEST LOG")
+        self.log_section("DocAgent-Arena TEST LOG")
         self.log(f"Timestamp: {datetime.now().isoformat()}")
         self.log(f"Log file: {self.log_file}")
         self.log("")

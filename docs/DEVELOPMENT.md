@@ -1,4 +1,4 @@
-# RAGRace Development Guide
+# DocAgent-Arena Development Guide
 
 ## Development Principles
 

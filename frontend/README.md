@@ -1,187 +1,150 @@
-# RAGRace Frontend
+# DocAgent Arena Frontend
 
-A Next.js web application for browsing RAG provider benchmark results and comparing PDF parsing quality.
+Next.js web interface for PDF parser comparison and RAG benchmarking.
 
 ## Overview
 
-This frontend provides:
-1. **Benchmark Results Browser** - Read-only interface to view RAG benchmark results from the backend API
-2. **PDF Parsing Comparison** - Interactive tool to compare PDF parsing across LlamaIndex, Reducto, and LandingAI with cost estimation
-
-Users can browse completed benchmark runs, compare provider performance, drill down into detailed question-by-question results, and test PDF parsing quality with real-time cost tracking.
+Three main features:
+1. **Parse Battle** (`/battle`) - Blind A/B testing of PDF parsers
+2. **Side-by-Side Comparison** (`/parse`) - Full document parsing comparison
+3. **RAG Results** (`/`, `/results/[id]`) - Browse RAG benchmark results
 
 ## Prerequisites
 
 - Node.js 18+ and npm
-- RAGRace backend API running (default: `http://localhost:8000`)
+- Backend API running at `http://localhost:8000`
 
-## Installation
+## Quick Start
 
 ```bash
 # Install dependencies
 npm install
-```
 
-## Configuration
+# Configure API URL
+echo "NEXT_PUBLIC_API_URL=http://localhost:8000" > .env.local
 
-Create a `.env.local` file in the frontend directory:
-
-```bash
-# Backend API URL
-NEXT_PUBLIC_API_URL=http://localhost:8000
-```
-
-## Development
-
-```bash
 # Start development server
 npm run dev
 
-# Open browser to http://localhost:3000
-```
-
-The development server will:
-- Hot-reload on file changes
-- Show detailed error messages
-- Connect to the backend API at the configured URL
-
-## Building for Production
-
-```bash
-# Build optimized production bundle
-npm run build
-
-# Start production server
-npm start
+# Open http://localhost:3000
 ```
 
 ## Project Structure
 
 ```
 frontend/
-├── app/                          # Next.js App Router pages
-│   ├── layout.tsx                # Root layout with Navbar
-│   ├── page.tsx                  # Home page (results list)
-│   ├── results/
-│   │   └── [run_id]/
-│   │       └── page.tsx          # Run details page
-│   ├── datasets/
-│   │   └── page.tsx              # Datasets info page
-│   └── parse/
-│       └── page.tsx              # PDF parsing comparison page
+├── app/
+│   ├── battle/           # Parse Battle UI
+│   │   ├── page.tsx      # Battle mode main page + history
+│   │   └── [battleId]/   # Battle detail view
+│   ├── parse/            # Side-by-side comparison
+│   │   └── page.tsx      # Full document parsing
+│   ├── results/          # RAG benchmark results
+│   │   └── [run_id]/     # Run detail view
+│   └── datasets/         # Dataset information
 │
 ├── components/
-│   ├── ui/                       # shadcn/ui components
-│   │   ├── table.tsx, card.tsx, badge.tsx, button.tsx
-│   │   ├── skeleton.tsx, collapsible.tsx, select.tsx
-│   │   └── ...
-│   ├── layout/
-│   │   └── Navbar.tsx            # Navigation component
-│   ├── results/
-│   │   ├── ResultsTable.tsx      # Benchmark runs table
-│   │   ├── RunDetails.tsx        # Detailed run view
-│   │   └── OverallResultsCard.tsx # Aggregate results with chart
-│   ├── parse/                    # PDF parsing components
-│   │   ├── ApiKeyForm.tsx        # API keys + provider config
-│   │   ├── CostEstimation.tsx    # Pre-parse cost estimation
-│   │   ├── FileUploadZone.tsx    # Drag-and-drop upload
-│   │   ├── PDFViewer.tsx         # PDF preview
-│   │   ├── MarkdownViewer.tsx    # Parsed markdown display
-│   │   ├── PageNavigator.tsx     # Page navigation controls
-│   │   ├── CostDisplay.tsx       # Actual cost breakdown
-│   │   └── ProcessingTimeDisplay.tsx # Processing time card
-│   └── providers/
-│       └── ProviderLabel.tsx     # Provider badge component
+│   ├── parse/            # Parsing UI components
+│   │   ├── FileUploadZone.tsx
+│   │   ├── ApiKeyForm.tsx
+│   │   ├── CostEstimation.tsx
+│   │   ├── PDFViewer.tsx
+│   │   └── MarkdownViewer.tsx
+│   ├── results/          # RAG results components
+│   └── ui/               # shadcn/ui components
 │
 ├── lib/
-│   ├── api-client.ts             # Backend API client
-│   ├── aggregateScores.ts        # Score aggregation utilities
-│   └── utils.ts                  # Utility functions
+│   ├── api-client.ts     # Backend API client
+│   └── utils.ts          # Utilities
 │
-├── types/
-│   └── api.ts                    # TypeScript type definitions
-│
-└── public/                       # Static assets
+└── types/
+    └── api.ts            # TypeScript types
 ```
-
-## Available Scripts
-
-- `npm run dev` - Start development server with webpack
-- `npm run build` - Build production bundle
-- `npm start` - Start production server
-- `npm run lint` - Run ESLint
 
 ## Pages
 
-### Home (`/`)
-- **Purpose**: Browse all benchmark runs
-- **Features**:
-  - Sortable table with run metadata
-  - Filter by dataset (coming soon)
-  - Click any row to view details
-  - Shows: Run ID, Dataset, Providers, Status, Document count, Question count, Date, Duration
+### Battle Mode (`/battle`)
 
-### Run Details (`/results/[run_id]`)
-- **Purpose**: View detailed results for a specific run
-- **Features**:
-  - Run metadata (dataset, providers, status, timing)
-  - **Overall aggregate results card** with:
-    - Run-level average scores across all documents
-    - Provider comparison table with success rates and durations
-    - Interactive bar chart with metric selection
-  - Document-by-document results
-  - Provider comparison tables
-  - Aggregated scores per provider per document
-  - **Expandable sections** for question-by-question results
-  - Ground truth vs. provider answers
-  - Retrieved context chunks
-  - Evaluation scores and latency metrics
+Blind A/B testing interface:
+- Upload PDF and select page for battle
+- Configure model options per provider
+- View blind comparison (Provider A vs B)
+- Submit feedback and reveal winners
+- Browse battle history with results
+
+**Key Components**: `BattleComparisonView`, `FeedbackForm`, `BattleHistory`, `BattleCard`
+
+### Parse Comparison (`/parse`)
+
+Full document parsing:
+- Drag-and-drop PDF upload
+- Select providers and configure options
+- Cost estimation before parsing
+- Page-by-page navigation
+- Download results
+
+**Key Components**: `FileUploadZone`, `ApiKeyForm`, `CostEstimation`, `PDFViewer`, `MarkdownViewer`
+
+### Results Browser (`/`)
+
+RAG benchmark results:
+- Sortable table of benchmark runs
+- Filter by dataset
+- Click row to view details
+
+### Run Details (`/results/[id]`)
+
+Detailed benchmark analysis:
+- Aggregate scores across documents
+- Interactive metric charts
+- Question-by-question results
+- Provider comparison tables
 
 ### Datasets (`/datasets`)
-- **Purpose**: View available benchmark datasets
-- **Features**:
-  - Dataset descriptions
-  - Available splits (train, validation, test)
-  - Document counts
-  - Task types
 
-### Parse (`/parse`)
-- **Purpose**: Compare PDF parsing quality across providers
-- **Features**:
-  - **File Upload**:
-    - Drag-and-drop PDF upload
-    - Automatic page count analysis
-    - File size validation
-  - **Provider Configuration**:
-    - API key management (localStorage persistence)
-    - **LlamaIndex**: Parse mode selection (LLM vs Agent) and model choice (GPT-4o-mini, Sonnet 4.0)
-    - **Reducto**: VLM enhancement toggle (standard 1 credit/page vs complex 2 credits/page)
-    - **LandingAI**: DPT-2 model (fixed)
-  - **Cost Estimation**:
-    - Pre-parse cost breakdown by provider
-    - Shows credits per page and total USD cost
-    - Based on actual pricing config from backend
-    - Confirm button to proceed with parsing
-  - **Parsing Results**:
-    - Side-by-side comparison of parsed markdown
-    - Page-by-page navigation with synchronized scrolling
-    - PDF preview alongside markdown output
-    - Processing time per provider
-    - Actual cost tracking with detailed breakdown
-  - **Download**:
-    - Download parsed markdown results
-    - Export parsing metadata and costs
-- **Workflow**: Upload PDF → Analyze (page count) → Configure providers → Review cost estimate → Parse → Compare results → Download
-- **State Management**: API keys and provider configs persisted to localStorage
+Available benchmark datasets information
 
 ## API Integration
 
-The frontend communicates with the RAGRace backend through two groups of endpoints:
+### Parsing Endpoints
 
-### Benchmark Endpoints
 ```typescript
-// Get list of runs
-GET /api/v1/results?limit=50&offset=0&dataset=qasper
+// Upload PDF
+POST /api/v1/parsing/upload
+FormData { file }
+
+// Get page count
+POST /api/v1/parsing/page-count
+{ file_id: string }
+
+// Run battle (single page)
+POST /api/v1/parsing/compare
+{
+  file_id: string,
+  page_number: number,
+  configs: { provider: { mode, model } }
+}
+
+// Submit feedback
+POST /api/v1/parsing/battle-feedback
+{
+  battle_id: string,
+  preferred_labels: string[],
+  comment: string
+}
+
+// Get battle history
+GET /api/v1/parsing/battles?limit=10&offset=0
+
+// Get battle detail
+GET /api/v1/parsing/battles/{battle_id}
+```
+
+### RAG Endpoints
+
+```typescript
+// List runs
+GET /api/v1/results?limit=50&offset=0
 
 // Get run details
 GET /api/v1/results/{run_id}
@@ -190,34 +153,7 @@ GET /api/v1/results/{run_id}
 GET /api/v1/datasets
 ```
 
-### Parsing Endpoints
-```typescript
-// Upload PDF file
-POST /api/v1/parsing/upload
-Body: FormData with 'file' field
-
-// Get page count
-POST /api/v1/parsing/page-count
-Body: { file_id: string }
-
-// Compare parsing across providers
-POST /api/v1/parsing/compare
-Body: {
-  file_id: string,
-  providers: string[],
-  api_keys: { [provider: string]: string },
-  configs: {
-    llamaindex?: { parse_mode: string, model: string },
-    reducto?: { mode: string, summarize_figures: boolean },
-    landingai?: { model: string }
-  }
-}
-
-// Download parsing result
-GET /api/v1/parsing/download-result/{file_id}/{provider}
-```
-
-See `lib/api-client.ts` for the full API client implementation.
+See `lib/api-client.ts` for full API client implementation.
 
 ## Technology Stack
 
@@ -225,76 +161,64 @@ See `lib/api-client.ts` for the full API client implementation.
 - **Language**: TypeScript
 - **Styling**: Tailwind CSS v3
 - **UI Components**: shadcn/ui
-- **Charts**: Recharts (for data visualizations)
-- **Date Formatting**: date-fns
+- **Charts**: Recharts
+- **Animation**: Framer Motion (battle mode)
 - **Icons**: lucide-react
 
-## Features
+## Development
 
-### Implemented ✅
-**Benchmark Results:**
-- Server-side rendering for fast initial loads
-- Responsive design (mobile, tablet, desktop)
-- Loading skeletons during data fetching
-- Error handling with user-friendly messages
-- Type-safe API client with TypeScript
-- Color-coded status indicators
-- Expandable detail views
-- Professional UI with shadcn/ui components
-- **Charts and visualizations** (interactive bar charts with metric selection)
-- **Run-level aggregate results** with cross-document score averaging
+```bash
+# Development mode with hot reload
+npm run dev
 
-**PDF Parsing:**
-- Drag-and-drop file upload with validation
-- Real-time page count analysis
-- **Cost estimation before parsing** with provider-specific configs
-- Side-by-side parsing comparison with page navigation
-- Processing time and cost tracking
-- Provider configuration (parse modes, models, VLM enhancement)
-- localStorage persistence for API keys and configs
-- Download parsed results
+# Production build
+npm run build
 
-### Future Enhancements 🚀
-- Additional chart types (radar charts, line charts)
-- Advanced filtering and sorting
-- Pagination for large result sets
-- Dark mode toggle
-- Export results (CSV, JSON)
-- Real-time updates for running benchmarks
-- Search functionality
-- Batch PDF parsing
-- Historical parsing comparison
+# Start production server
+npm start
+
+# Lint
+npm run lint
+```
+
+## State Management
+
+- **API Keys**: Stored in localStorage, persisted across sessions
+- **Provider Configs**: Stored in localStorage per provider
+- **Battle State**: React state, cleared on page refresh
+- **Parse Results**: React state, temporary
+
+## Styling
+
+Built with Tailwind CSS v3 and shadcn/ui components. Theme configured in `tailwind.config.js`.
 
 ## Troubleshooting
 
-### Frontend won't connect to backend
-1. Verify backend API is running: `curl http://localhost:8000/api/health`
-2. Check `.env.local` has correct `NEXT_PUBLIC_API_URL`
-3. Ensure CORS is enabled in backend (already configured)
+### Backend connection issues
+```bash
+# Check backend is running
+curl http://localhost:8000/api/health
+
+# Verify .env.local
+cat .env.local
+```
 
 ### Build errors
-1. Delete `.next` directory: `rm -rf .next`
-2. Clear node_modules: `rm -rf node_modules package-lock.json`
-3. Reinstall: `npm install`
-4. Rebuild: `npm run build`
-
-### Styling not working
-1. Verify Tailwind CSS is properly configured in `tailwind.config.js`
-2. Check `app/globals.css` imports Tailwind directives
-3. Restart dev server after config changes
+```bash
+# Clean rebuild
+rm -rf .next node_modules package-lock.json
+npm install
+npm run build
+```
 
 ## Contributing
 
-When adding new features:
-
-1. **Add types** to `types/api.ts` if using new API responses
-2. **Update API client** in `lib/api-client.ts` for new endpoints
-3. **Create reusable components** in `components/`
-4. **Follow naming conventions**:
-   - Components: PascalCase (e.g., `ResultsTable.tsx`)
-   - Utilities: camelCase (e.g., `api-client.ts`)
-   - Types: PascalCase interfaces (e.g., `RunSummary`)
+When adding features:
+1. Add TypeScript types to `types/api.ts`
+2. Update API client in `lib/api-client.ts`
+3. Create reusable components in `components/`
+4. Follow existing naming conventions (PascalCase for components)
 
 ## License
 
-Part of the RAGRace project.
+Part of the DocAgent Arena project (MIT License).

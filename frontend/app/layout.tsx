@@ -14,8 +14,8 @@ const geistMono = Geist_Mono({
 });
 
 export const metadata: Metadata = {
-  title: "RAGRace - Benchmark Results",
-  description: "View and compare RAG provider benchmark results",
+  title: "DocAgent Arena - PDF Parser Comparison",
+  description: "Blind A/B testing for PDF parsers. Compare parsing quality across providers with transparent pricing.",
 };
 
 export default function RootLayout({

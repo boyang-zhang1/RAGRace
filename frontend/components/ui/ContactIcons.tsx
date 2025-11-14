@@ -13,7 +13,7 @@ export function ContactIcons() {
         <Mail className="h-6 w-6" />
       </a>
       <a
-        href="https://github.com/boyang-zhang1/RAGRace"
+        href="https://github.com/boyang-zhang1/DocAgent-Arena"
         target="_blank"
         rel="noopener noreferrer"
         className="bg-white dark:bg-gray-800 rounded-full p-3 shadow-lg text-gray-600 hover:text-gray-900 dark:text-gray-400 dark:hover:text-gray-100 hover:shadow-xl transition-all"

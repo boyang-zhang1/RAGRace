@@ -208,7 +208,7 @@ async def main():
     """Main migration function."""
 
     print("="*80)
-    print("RAGRace Benchmark Results Migration")
+    print("DocAgent-Arena Benchmark Results Migration")
     print("="*80)
 
     # Initialize Prisma client

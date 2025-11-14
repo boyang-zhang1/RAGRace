@@ -1,4 +1,4 @@
-# RAGRace Benchmark Configuration - Test Run (1 doc, 2 questions)
+# DocAgent-Arena Benchmark Configuration - Test Run (1 doc, 2 questions)
 
 benchmark:
   # Dataset configuration

@@ -1,8 +1,8 @@
-# RAGRace Adapter Reference
+# DocAgent-Arena Adapter Reference
 
 ## Overview
 
-All RAG providers in RAGRace implement the `BaseAdapter` interface for standardized comparison. This document provides detailed specifications for each integrated adapter.
+All RAG providers in DocAgent-Arena implement the `BaseAdapter` interface for standardized comparison. This document provides detailed specifications for each integrated adapter.
 
 ## BaseAdapter Interface
 
